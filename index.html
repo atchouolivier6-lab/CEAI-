@@ -36,10 +36,10 @@
     </div>
   </div>
 
-  <!-- === VÉRIFICATION ACCÈS ADMINISTRATION === -->
+  <!-- === VÉRIFICATION ACCÈS ADMINISTRATEUR === -->
   <div id="adminVerifScreen" class="login-screen depenses-screen cache">
     <div class="login-box">
-      <h2>Accès Administration</h2>
+      <h2>Accès Administrateur</h2>
       <input type="password" id="mdpAdminVerif" placeholder="Mot de passe administrateur" />
       <button onclick="verifierAdmin()">Accéder</button>
       <p id="erreurAdmin" class="erreur"></p>
@@ -80,6 +80,7 @@
             <a href="#" onclick="afficherSection('paiement')">Faire mon paiement</a>
             <a href="#" onclick="afficherSection('publication')">Espace de publication</a>
             <a href="#" onclick="afficherSection('apropos')">À propos de CEAI</a>
+            <a href="#" onclick="ouvrirEspaceAdmin()">Accès Administrateur</a>
             <a href="#" onclick="deconnexion()">Se déconnecter</a>
           </div>
         </div>
@@ -117,24 +118,21 @@
         </div>
       </section>
 
-      <!-- === AJOUTER UN MEMBRE === -->
+      <!-- === AJOUTER UN MEMBRE — UNIQUEMENT ADMIN === -->
       <section id="sec-admin-membres" class="section">
         <h2>Ajouter un membre</h2>
-        <p class="note">Pas de limite de membres · Le système détecte automatiquement les doublons</p>
-        <div class="formulaire">
+        <p class="note zone-admin cache">Pas de limite de membres · Le système détecte automatiquement les doublons</p>
+        <div class="formulaire zone-admin cache">
           <h3>Enregistrer un nouveau membre</h3>
           <input type="text" id="nomMembreAdmin" placeholder="Nom et Prénom *" />
           <input type="tel" id="telMembreAdmin" placeholder="Numéro de téléphone" />
           <input type="text" id="dateAdhesionAdmin" placeholder="Date d'adhésion (ex: 15/01/2026)" />
           <button onclick="ajouterMembreAdmin()">Enregistrer le membre</button>
         </div>
-        <div class="liste-conteneur">
-          <h3>Liste des membres</h3>
-          <div id="listeMembresAdmin"></div>
-        </div>
+        <p class="note">Cette partie est réservée à l'administrateur.</p>
       </section>
 
-      <!-- === ADHÉSION === -->
+      <!-- === ADHÉSION — PUBLIQUE === -->
       <section id="sec-adherer" class="section">
         <h2>Adhérer à CEAI</h2>
         <p class="note">Remplissez le formulaire pour rejoindre l'association</p>
@@ -151,15 +149,18 @@
       <!-- === SUIVI DES COTISATIONS === -->
       <section id="sec-cotisations" class="section">
         <h2>Suivi des cotisations</h2>
-        <div class="formulaire">
+
+        <!-- SESSION ET QUOTA — UNIQUEMENT ADMIN -->
+        <div class="formulaire zone-admin cache">
           <h3>Session du mois</h3>
-          <input type="text" id="sessionMois" placeholder="Entrer la session du mois (ex: Septembre 2050)" />
-          
+          <input type="text" id="sessionMois" placeholder="Entrer la session du mois (ex: Septembre 2026)" />
           <input type="number" id="quotaMois" placeholder="Quota mensuel (minimum 500 F)" min="500" />
-          
           <button onclick="changerSession()">Valider la session et le quota</button>
-          
-          <h3 style="margin-top:1.5rem;">Enregistrer un versement</h3>
+        </div>
+
+        <!-- ENREGISTRER VERSEMENT --- ACCESSIBLE -->
+        <div class="formulaire">
+          <h3>Enregistrer un versement</h3>
           <select id="selectionMembreCot">
             <option value="">-- Choisir un membre --</option>
           </select>
@@ -167,8 +168,8 @@
           <button onclick="enregistrerVersement()">Enregistrer le versement</button>
           
           <div style="margin-top:1.5rem; display:flex; gap:0.8rem; flex-wrap:wrap;">
-            <button onclick="ouvrirDepenses()">Dépenses & Réalisations</button>
-            <button class="btn-cloturer" onclick="demanderCloture()">Clôturer définitivement ce mois</button>
+            <button class="zone-admin cache" onclick="ouvrirDepenses()">Dépenses & Réalisations</button>
+            <button class="btn-cloturer zone-admin cache" onclick="demanderCloture()">Clôturer définitivement ce mois</button>
             <button onclick="exporterReleve()">Télécharger le relevé</button>
           </div>
         </div>
@@ -178,8 +179,8 @@
           <div id="tableauVersements"></div>
         </div>
 
-        <!-- Dépenses & Réalisations -->
-        <div id="blocDepenses" class="cache">
+        <!-- DÉPENSES & RÉALISATIONS --- UNIQUEMENT ADMIN -->
+        <div id="blocDepenses" class="cache zone-admin">
           <h3>Dépenses & Réalisations</h3>
           <div class="formulaire">
             <input type="number" id="montantDepense" placeholder="Somme dépensée (F CFA)" min="0" />
@@ -189,18 +190,12 @@
           <div id="listeDepenses"></div>
         </div>
 
-        <!-- Notifications de paiements -->
+        <!-- NOTIFICATIONS --- ACCESSIBLE -->
         <h3 style="margin-top:2rem;">Derniers paiements enregistrés</h3>
         <div id="notificationsPaiement"></div>
-
-        <!-- Mois clôturés -->
-        <div style="margin-top:2rem;">
-          <h3>Mois clôturés</h3>
-          <div id="moisClotures"></div>
-        </div>
       </section>
 
-      <!-- === FAIRE MON PAIEMENT === -->
+      <!-- === FAIRE MON PAIEMENT — PUBLIQUE === -->
       <section id="sec-paiement" class="section">
         <h2>Faire mon paiement</h2>
         <div class="formulaire">
@@ -222,20 +217,21 @@
         <p id="msgPaiement" class="message-info"></p>
       </section>
 
-      <!-- === ESPACE DE PUBLICATION === -->
+      <!-- === ESPACE DE PUBLICATION — UNIQUEMENT ADMIN === -->
       <section id="sec-publication" class="section">
         <h2>Espace de publication</h2>
-        <p class="note">Publier des photos et vidéos de nos manifestations et réalisations</p>
-        <div class="formulaire">
+        <p class="note zone-admin cache">Publier des photos et vidéos de nos manifestations et réalisations</p>
+        <div class="formulaire zone-admin cache">
           <input type="file" id="fichierPub" accept="image/*,video/mp4,video/webm" />
           <textarea id="descriptionPub" placeholder="Description de la publication..." rows="4"></textarea>
           <button onclick="publier()">Publier</button>
         </div>
+        <p class="note">Cette partie est réservée à l'administrateur.</p>
         <h3>Publications enregistrées</h3>
         <div id="listePublications"></div>
       </section>
 
-      <!-- === À PROPOS DE CEAI === -->
+      <!-- === À PROPOS DE CEAI — PUBLIQUE === -->
       <section id="sec-apropos" class="section">
         <h2>À propos de CEAI</h2>
         <div class="bloc-propos">
@@ -263,4 +259,4 @@
   <!-- === FIREBASE === -->
   <script type="module" src="script.js"></script>
 </body>
-        </html>
+          </html>
