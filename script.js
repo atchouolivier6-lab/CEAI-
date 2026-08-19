@@ -1,5 +1,5 @@
 // =====================================================
-// CONFIGURATION FIREBASE
+// CONFIGURATION FIREBASE — REALTIME DATABASE
 // =====================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
 import { 
@@ -8,10 +8,9 @@ import {
   onAuthStateChanged 
 } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
 import { 
-  getFirestore, doc, setDoc, getDoc, 
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
+  getDatabase, ref, set, get, child 
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-database.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCLLaCYpJpuZIWLALs3YxTf_-WqB4nP03Y",
@@ -23,10 +22,10 @@ const firebaseConfig = {
   appId: "1:340494575762:web:fc6e538d64c97a67651e4b"
 };
 
-// Initialisation Firebase
+// INITIALISATION
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = getDatabase(app);
 const storage = getStorage(app);
 
 // =====================================================
@@ -34,7 +33,7 @@ const storage = getStorage(app);
 // =====================================================
 const MOT_DE_PASSE_ADMIN = "ceaiadmin2026";
 const QUOTA_MIN = 500;
-const EMAIL_CONCEPTEUR = "atchou.olivier@exemple.com"; // Remplacez par votre email
+const EMAIL_CONCEPTEUR = "atchouolivier@email.com"; // Remplacez par votre email
 
 // =====================================================
 // ETAT GLOBAL
@@ -48,18 +47,8 @@ let notifications = [];
 let accesAdmin = false;
 let estConcepteur = false;
 
-// Liste des fondateurs par defaut
-const FONDATEURS_DEFAUT = [
-  { id: 1, nom: "ATCHOU Basile", photo: "" },
-  { id: 2, nom: "KASSEIGNE Charles", photo: "" },
-  { id: 3, nom: "ATCHOU Jules", photo: "" },
-  { id: 4, nom: "AKPA Emile", photo: "" },
-  { id: 5, nom: "ATCHOU Olivier", photo: "" }
-];
-let fondateurs = [...FONDATEURS_DEFAUT];
-
 // =====================================================
-// SURVEILLER LA CONNEXION
+// SURVEILLER ETAT DE CONNEXION
 // =====================================================
 onAuthStateChanged(auth, async (user) => {
   if (user) {
@@ -72,6 +61,7 @@ onAuthStateChanged(auth, async (user) => {
     mettreAJourVisibiliteAdmin();
   } else {
     utilisateurCourant = null;
+    accesAdmin = false;
     document.getElementById("authScreen").classList.remove("cache");
     document.getElementById("sitePrincipal").classList.add("cache");
   }
@@ -86,17 +76,17 @@ window.sInscrire = async function () {
   const mdp = document.getElementById("inscMdp").value;
   const erreur = document.getElementById("inscErreur");
   
-  if (!nom || !email || mdp.length < 6) 
-    return erreur.textContent = "Remplissez tous les champs (6 caracteres minimum pour le mot de passe)";
+  if (!nom || !email || mdp.length < 6) {
+    erreur.textContent = "Remplissez tous les champs (6 caracteres minimum pour le mot de passe)";
+    return;
+  }
 
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, mdp);
-    await setDoc(doc(db, "utilisateurs", cred.user.uid), {
-      nom, email, dateInscription: serverTimestamp()
-    });
+    await set(ref(db, "utilisateurs/" + cred.user.uid), { nom, email });
     erreur.textContent = "Compte cree ! Connexion en cours...";
   } catch (e) {
-    erreur.textContent = traduireErreur(e.code);
+    erreur.textContent = "Erreur : " + traduireErreurAuth(e.code);
   }
 };
 
@@ -111,23 +101,9 @@ window.seConnecter = async function () {
   try {
     await signInWithEmailAndPassword(auth, email, mdp);
   } catch (e) {
-    erreur.textContent = traduireErreur(e.code);
+    erreur.textContent = "Erreur : " + traduireErreurAuth(e.code);
   }
 };
-
-// =====================================================
-// TRADUCTION DES ERREURS
-// =====================================================
-function traduireErreur(code) {
-  const t = {
-    "auth/email-already-in-use": "Cet email est deja utilise",
-    "auth/user-not-found": "Aucun compte trouve avec cet email",
-    "auth/wrong-password": "Mot de passe incorrect",
-    "auth/invalid-email": "Adresse email invalide",
-    "auth/weak-password": "Mot de passe trop faible (6 caracteres minimum)"
-  };
-  return t[code] || "Erreur de connexion. Reessayez.";
-}
 
 // =====================================================
 // DECONNEXION
@@ -135,63 +111,79 @@ function traduireErreur(code) {
 window.deconnexion = async function () {
   await signOut(auth);
   accesAdmin = false;
+  mettreAJourVisibiliteAdmin();
+  viderChampsAuth();
+};
+
+function viderChampsAuth() {
   document.getElementById("connEmail").value = "";
   document.getElementById("connMdp").value = "";
   document.getElementById("authErreur").textContent = "";
   document.getElementById("inscErreur").textContent = "";
-  mettreAJourVisibiliteAdmin();
-};
+}
 
 // =====================================================
-// CHARGER TOUTES LES DONNEES DEPUIS FIREBASE
+// TRADUCTION ERREURS
+// =====================================================
+function traduireErreurAuth(code) {
+  const erreurs = {
+    "auth/email-already-in-use": "Cet email est deja utilise",
+    "auth/invalid-email": "Email invalide",
+    "auth/operation-not-allowed": "Operation non autorisee",
+    "auth/weak-password": "Mot de passe trop faible (6 caracteres minimum)",
+    "auth/user-disabled": "Compte desactive",
+    "auth/user-not-found": "Aucun compte trouve",
+    "auth/wrong-password": "Mot de passe incorrect",
+    "auth/network-request-failed": "Verifiez votre connexion internet"
+  };
+  return erreurs[code] || "Une erreur est survenue";
+}
+
+// =====================================================
+// CHARGER DONNEES
 // =====================================================
 async function chargerDonneesFirebase() {
   try {
-    const docMembres = await getDoc(doc(db, "ceai_data", "membres"));
-    if (docMembres.exists()) membres = docMembres.data().liste || [];
+    const dbRef = ref(db);
+    
+    const snapMembres = await get(child(dbRef, "membres"));
+    if (snapMembres.exists()) membres = snapMembres.val() || [];
 
-    const docSessions = await getDoc(doc(db, "ceai_data", "sessions"));
-    if (docSessions.exists()) sessions = docSessions.data() || {};
+    const snapSessions = await get(child(dbRef, "sessions"));
+    if (snapSessions.exists()) sessions = snapSessions.val() || {};
 
-    const docSession = await getDoc(doc(db, "ceai_data", "session_actuelle"));
-    if (docSession.exists()) sessionActuelle = docSession.data().nom || "";
+    const snapSession = await get(child(dbRef, "session_actuelle"));
+    if (snapSession.exists()) sessionActuelle = snapSession.val() || "";
 
-    const docPubs = await getDoc(doc(db, "ceai_data", "publications"));
-    if (docPubs.exists()) publications = docPubs.data().liste || [];
+    const snapPubs = await get(child(dbRef, "publications"));
+    if (snapPubs.exists()) publications = snapPubs.val() || [];
 
-    const docNotifs = await getDoc(doc(db, "ceai_data", "notifications"));
-    if (docNotifs.exists()) notifications = docNotifs.data().liste || [];
-
-    const docFonds = await getDoc(doc(db, "ceai_data", "fondateurs"));
-    if (docFonds.exists() && docFonds.data().liste) fondateurs = docFonds.data().liste;
+    const snapNotifs = await get(child(dbRef, "notifications"));
+    if (snapNotifs.exists()) notifications = snapNotifs.val() || [];
 
     mettreAJourListeMembresSelect();
+    mettreAJourAffichageSession();
+    mettreAJourPublicationsAccueil();
   } catch (e) {
-    console.error("Erreur de chargement :", e);
+    console.error("Erreur chargement :", e);
+    alert("Impossible de charger les donnees. Verifiez les regles Firebase.");
   }
 }
 
 // =====================================================
-// SAUVEGARDER LES DONNEES
+// SAUVEGARDER DONNEES
 // =====================================================
 async function sauvegarder(type) {
   try {
     switch(type) {
-      case "membres":
-        await setDoc(doc(db, "ceai_data", "membres"), { liste: membres }); break;
-      case "sessions":
-        await setDoc(doc(db, "ceai_data", "sessions"), sessions); break;
-      case "session_actuelle":
-        await setDoc(doc(db, "ceai_data", "session_actuelle"), { nom: sessionActuelle }); break;
-      case "publications":
-        await setDoc(doc(db, "ceai_data", "publications"), { liste: publications }); break;
-      case "notifications":
-        await setDoc(doc(db, "ceai_data", "notifications"), { liste: notifications }); break;
-      case "fondateurs":
-        await setDoc(doc(db, "ceai_data", "fondateurs"), { liste: fondateurs }); break;
+      case "membres": await set(ref(db, "membres"), membres); break;
+      case "sessions": await set(ref(db, "sessions"), sessions); break;
+      case "session_actuelle": await set(ref(db, "session_actuelle"), sessionActuelle); break;
+      case "publications": await set(ref(db, "publications"), publications); break;
+      case "notifications": await set(ref(db, "notifications"), notifications); break;
     }
   } catch (e) {
-    console.error("Erreur de sauvegarde :", e);
+    console.error("Erreur sauvegarde :", e);
   }
 }
 
@@ -204,11 +196,8 @@ window.toggleMenu = function () {
 
 window.afficherSection = function (nom) {
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
-  document.getElementById(`sec-${nom}`).classList.add("active");
+  document.getElementById("sec-" + nom).classList.add("active");
   document.getElementById("optionsMenu").classList.remove("ouvert");
-  document.getElementById("blocDepenses").classList.add("cache");
-  mettreAJourPublicationsAccueil();
-  afficherListeFondateurs();
   mettreAJourVisibiliteAdmin();
 };
 
@@ -225,20 +214,14 @@ window.basculerConnexion = function () {
 };
 
 // =====================================================
-// GESTION DE LA VISIBILITE ADMINISTRATEUR
+// GESTION AFFICHAGE ADMIN
 // =====================================================
 function mettreAJourVisibiliteAdmin() {
-  const elementsAdmin = document.querySelectorAll(".zone-admin");
-  if (accesAdmin) {
-    elementsAdmin.forEach(el => el.classList.remove("cache"));
-  } else {
-    elementsAdmin.forEach(el => el.classList.add("cache"));
-  }
+  document.querySelectorAll(".zone-admin").forEach(el => {
+    accesAdmin ? el.classList.remove("cache") : el.classList.add("cache");
+  });
 }
 
-// =====================================================
-// OUVERTURE ESPACE ADMINISTRATEUR
-// =====================================================
 window.ouvrirEspaceAdmin = function () {
   document.getElementById("adminVerifScreen").classList.remove("cache");
   document.querySelector("#adminVerifScreen h2").textContent = "Acces Administrateur";
@@ -250,20 +233,20 @@ window.fermerVerifAdmin = function () {
   document.getElementById("erreurAdmin").textContent = "";
 };
 
-window.verifierAdmin = async function () {
+window.verifierAdmin = function () {
   const saisi = document.getElementById("mdpAdminVerif").value;
   if (saisi === MOT_DE_PASSE_ADMIN) {
     accesAdmin = true;
     fermerVerifAdmin();
     mettreAJourVisibiliteAdmin();
-    alert("Acces administrateur valide. Vous pouvez gerer les membres et cloturer les mois.");
+    alert("Acces administrateur valide.");
   } else {
-    document.getElementById("erreurAdmin").textContent = "Acces refuse";
+    document.getElementById("erreurAdmin").textContent = "Mot de passe incorrect";
   }
 };
 
 // =====================================================
-// AJOUTER UN MEMBRE — UNIQUEMENT ADMIN
+// AJOUTER MEMBRE — ADMIN SEUL
 // =====================================================
 function membreExisteDeja(nom, tel) {
   return membres.some(m => 
@@ -278,15 +261,17 @@ window.ajouterMembreAdmin = async function () {
   const nom = document.getElementById("nomMembreAdmin").value.trim();
   const tel = document.getElementById("telMembreAdmin").value.trim();
   const date = document.getElementById("dateAdhesionAdmin").value.trim();
+  
   if (!nom) return alert("Saisissez le nom et prenom");
   if (membreExisteDeja(nom, tel)) return alert("Ce membre existe deja");
-  
-  membres.push({ id: Date.now(), nom, tel, dateAdhesion: date });
+
+  membres.push({ id: Date.now(), nom, tel, date: date || new Date().toLocaleDateString("fr-FR") });
   await sauvegarder("membres");
   
   document.getElementById("nomMembreAdmin").value = "";
   document.getElementById("telMembreAdmin").value = "";
   document.getElementById("dateAdhesionAdmin").value = "";
+  
   mettreAJourAffichageGlobal();
   mettreAJourListeMembresSelect();
   alert("Membre ajoute avec succes");
@@ -304,19 +289,20 @@ window.soumettreAdhesion = async function () {
   if (!nom) return msg.textContent = "Saisissez votre nom et prenom";
   if (membreExisteDeja(nom, tel)) return msg.textContent = "Vous etes deja membre";
   
-  membres.push({ id: Date.now(), nom, tel, dateAdhesion: date || new Date().toLocaleDateString("fr-FR") });
+  membres.push({ id: Date.now(), nom, tel, date: date || new Date().toLocaleDateString("fr-FR") });
   await sauvegarder("membres");
   
   document.getElementById("nomAdherent").value = "";
   document.getElementById("telAdherent").value = "";
   document.getElementById("dateAdhesion").value = "";
+  
   msg.textContent = "Adhesion enregistree avec succes. Bienvenue a CEAI.";
   mettreAJourAffichageGlobal();
   mettreAJourListeMembresSelect();
 };
 
 // =====================================================
-// SESSION ET QUOTA MENSUEL
+// GERER SESSION — ADMIN SEUL
 // =====================================================
 window.changerSession = async function () {
   if (!accesAdmin) return alert("Acces administrateur requis");
@@ -329,45 +315,41 @@ window.changerSession = async function () {
   
   sessionActuelle = saisie;
   if (!sessions[sessionActuelle]) {
-    sessions[sessionActuelle] = { 
-      cloture: false, 
-      versements: {}, 
-      depenses: [],
-      quota: quota,
-      capitalMois: 0
-    };
+    sessions[sessionActuelle] = { cloture: false, versements: {}, depenses: [], quota: quota, capital: 0 };
   } else {
-    if (sessions[sessionActuelle].cloture) return alert("Ce mois est cloture, modification impossible");
+    if (sessions[sessionActuelle].cloture) return alert("Cette session est cloturee, modification impossible");
     sessions[sessionActuelle].quota = quota;
   }
   
   await sauvegarder("session_actuelle");
   await sauvegarder("sessions");
   mettreAJourAffichageSession();
+  alert("Session mise a jour");
 };
 
 // =====================================================
-// ENREGISTRER UN VERSEMENT
+// ENREGISTRER VERSEMENT
 // =====================================================
 window.enregistrerVersement = async function () {
   if (!sessionActuelle) return alert("Validez d'abord la session du mois");
   const s = sessions[sessionActuelle];
-  if (s.cloture) return alert("Ce mois est cloture, modification impossible");
+  if (s.cloture) return alert("Session cloturee, impossible de modifier");
   
   const idMembre = document.getElementById("selectionMembreCot").value;
   const montant = parseInt(document.getElementById("montantVerse").value) || 0;
+  
   if (!idMembre) return alert("Selectionnez un membre");
-  if (!montant || montant <= 0) return alert("Indiquez un montant valide");
+  if (montant <= 0) return alert("Indiquez un montant valide");
 
-  const membre = membres.find(m => m.id == idMembre);
   s.versements[idMembre] = (s.versements[idMembre] || 0) + montant;
-  s.capitalMois = (s.capitalMois || 0) + montant;
+  s.capital = Object.values(s.versements).reduce((a, b) => a + b, 0);
 
+  const membre = membres.find(m => String(m.id) === String(idMembre));
   notifications.unshift({
     id: Date.now(),
     nom: membre ? membre.nom : "Membre inconnu",
-    montant: montant,
-    date: new Date().toLocaleString("fr-FR"),
+    montant,
+    date: new Date().toLocaleDateString("fr-FR"),
     session: sessionActuelle
   });
   if (notifications.length > 20) notifications.pop();
@@ -378,40 +360,42 @@ window.enregistrerVersement = async function () {
   document.getElementById("montantVerse").value = "";
   mettreAJourAffichageSession();
   mettreAJourAffichageGlobal();
+  alert("Versement enregistre");
 };
 
 // =====================================================
-// CLOTURE DU MOIS — UNIQUEMENT ADMIN
+// CLOTURER MOIS — ADMIN SEUL
 // =====================================================
-window.demanderCloture = function () {
+window.demanderCloture = async function () {
   if (!accesAdmin) return alert("Acces administrateur requis");
   if (!sessionActuelle) return alert("Aucune session selectionnee");
   
-  if (confirm(`Confirmer la cloture definitive de « ${sessionActuelle} » ?\nLe capital sera sauvegarde et remis a zero au prochain mois.\nAucune modification ne sera plus possible.`)) {
-    cloturerMoisFinal();
+  if (confirm(`Confirmez-vous la cloture de « ${sessionActuelle} » ?\nAucune modification ne sera plus possible.`)) {
+    sessions[sessionActuelle].cloture = true;
+    await sauvegarder("sessions");
+    mettreAJourAffichageSession();
+    alert(`Session « ${sessionActuelle} » cloturee.`);
   }
 };
-
-async function cloturerMoisFinal() {
-  sessions[sessionActuelle].cloture = true;
-  sessions[sessionActuelle].capitalMois = sessions[sessionActuelle].capitalMois || 0;
-  await sauvegarder("sessions");
-  
-  mettreAJourAffichageSession();
-  alert(`Mois « ${sessionActuelle} » cloture. Le capital a ete sauvegarde.`);
-}
 
 // =====================================================
 // DEPENSES
 // =====================================================
+window.ouvrirDepenses = function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+  document.getElementById("blocDepenses").classList.remove("cache");
+  afficherListeDepenses();
+};
+
 window.enregistrerDepense = async function () {
   if (!accesAdmin) return alert("Acces administrateur requis");
   if (!sessionActuelle) return alert("Validez d'abord la session");
   const s = sessions[sessionActuelle];
-  if (s.cloture) return alert("Mois cloture");
+  if (s.cloture) return alert("Session cloturee");
   
   const montant = parseInt(document.getElementById("montantDepense").value) || 0;
   const projet = document.getElementById("projetConcerne").value.trim();
+  
   if (!montant || !projet) return alert("Remplissez tous les champs");
   
   s.depenses.push({ montant, projet, date: new Date().toLocaleDateString("fr-FR") });
@@ -419,22 +403,16 @@ window.enregistrerDepense = async function () {
   
   document.getElementById("montantDepense").value = "";
   document.getElementById("projetConcerne").value = "";
-  afficherDepensesSession();
+  afficherListeDepenses();
 };
 
-function afficherDepensesSession() {
+function afficherListeDepenses() {
   if (!sessionActuelle || !sessions[sessionActuelle]) return;
   const liste = sessions[sessionActuelle].depenses;
   document.getElementById("listeDepenses").innerHTML = liste.length === 0
     ? "<p>Aucune depense enregistree</p>"
     : liste.map(d => `<div class="ligne-depense"><span>${d.projet}</span><span>${d.montant.toLocaleString("fr-FR")} F · ${d.date}</span></div>`).join("");
 }
-
-window.ouvrirDepenses = function () {
-  if (!accesAdmin) return alert("Acces administrateur requis");
-  document.getElementById("blocDepenses").classList.remove("cache");
-  afficherDepensesSession();
-};
 
 // =====================================================
 // PAIEMENT
@@ -463,6 +441,7 @@ window.confirmerPaiementDeclare = async function () {
   msg.innerHTML = `Merci ${nom} !<br>Versement de ${montant.toLocaleString("fr-FR")} F enregistre en attente de validation.`;
   document.getElementById("infosPaiement").classList.add("cache");
   document.getElementById("nomPayeur").value = "";
+  document.getElementById("montantAPayer").value = "";
 };
 
 // =====================================================
@@ -478,17 +457,21 @@ window.publier = async function () {
   let urlFichier = null;
   if (fichier) {
     if (fichier.size > 8 * 1024 * 1024) return alert("Fichier de 8 Mo maximum");
-    const refFichier = ref(storage, `publications/${Date.now()}_${fichier.name}`);
-    const result = await uploadBytes(refFichier, fichier);
-    urlFichier = await getDownloadURL(result.ref);
+    const refFichier = storageRef(storage, `publications/${Date.now()}_${fichier.name}`);
+    const resultat = await uploadBytes(refFichier, fichier);
+    urlFichier = await getDownloadURL(resultat.ref);
   }
 
   publications.unshift({
-    id: Date.now(), auteur: utilisateurCourant?.email || "Anonyme",
+    id: Date.now(),
+    auteur: utilisateurCourant?.email || "Anonyme",
     date: new Date().toLocaleString("fr-FR"),
-    url: urlFichier, type: fichier?.type || null, description
+    url: urlFichier,
+    type: fichier?.type || null,
+    description
   });
   await sauvegarder("publications");
+  
   document.getElementById("fichierPub").value = "";
   document.getElementById("descriptionPub").value = "";
   alert("Publie avec succes");
@@ -496,24 +479,11 @@ window.publier = async function () {
 };
 
 // =====================================================
-// FONDATEURS
-// =====================================================
-function afficherListeFondateurs() {
-  const conteneur = document.getElementById("listeFondateurs");
-  conteneur.innerHTML = fondateurs.map(f => `
-    <div class="carte-fondateur">
-      <img src="${f.photo || 'https://via.placeholder.com/90?text='+f.nom.substring(0,2)}" alt="${f.nom}" />
-      <h4>${f.nom}</h4>
-    </div>
-  `).join("");
-}
-
-// =====================================================
 // MISES A JOUR AFFICHAGE
 // =====================================================
 function mettreAJourAffichageGlobal() {
   document.getElementById("nbMembres").textContent = membres.length;
-  const capital = sessionActuelle && sessions[sessionActuelle] ? sessions[sessionActuelle].capitalMois || 0 : 0;
+  const capital = sessionActuelle && sessions[sessionActuelle] ? sessions[sessionActuelle].capital || 0 : 0;
   document.getElementById("capitalGlobal").textContent = capital.toLocaleString("fr-FR") + " F CFA";
   document.getElementById("sessionEnCours").textContent = sessionActuelle || "Non definie";
 }
@@ -528,8 +498,9 @@ function mettreAJourAffichageSession() {
   if (!sessionActuelle || !sessions[sessionActuelle]) return;
   const s = sessions[sessionActuelle];
   const quota = s.quota || 0;
+  
   document.getElementById("titreSession").textContent = 
-    `Cotisations — ${sessionActuelle} — Quota: ${quota.toLocaleString("fr-FR")} F ${s.cloture ? 'CLOTURE' : ''}`;
+    `Cotisations — ${sessionActuelle} — Quota: ${quota.toLocaleString("fr-FR")} F ${s.cloture ? 'CLOTUREE' : ''}`;
   
   document.getElementById("tableauVersements").innerHTML = membres.map(m => {
     const verse = s.versements[m.id] || 0;
@@ -543,7 +514,7 @@ function mettreAJourAffichageSession() {
     </div>`;
   }).join("");
 
-  document.getElementById("notificationsPaiement").innerHTML = notifications.slice(0,5).map(n => `
+  document.getElementById("notificationsPaiement").innerHTML = notifications.slice(0, 5).map(n => `
     <div class="ligne-notif">${n.nom} : ${n.montant.toLocaleString("fr-FR")} F — ${n.date}</div>
   `).join("") || "<p>Aucune notification</p>";
 
@@ -552,10 +523,15 @@ function mettreAJourAffichageSession() {
 
 function mettreAJourPublicationsAccueil() {
   const conteneur = document.getElementById("publicationsAccueil");
+  const listePub = document.getElementById("listePublications");
+  
   if (!publications.length) {
-    conteneur.innerHTML = "<p class='note'>Aucune publication pour l'instant</p>"; return;
+    conteneur.innerHTML = "<p class='note'>Aucune publication pour l'instant</p>";
+    if (listePub) listePub.innerHTML = "<p class='note'>Aucune publication pour l'instant</p>";
+    return;
   }
-  conteneur.innerHTML = publications.map(pub => `
+
+  const html = publications.map(pub => `
     <div class="carte-publication">
       ${pub.url ? (pub.type?.startsWith('video') 
         ? `<video controls src="${pub.url}" style="max-height:250px;"></video>` 
@@ -566,22 +542,35 @@ function mettreAJourPublicationsAccueil() {
       </div>
     </div>
   `).join("");
+
+  conteneur.innerHTML = html;
+  if (listePub) listePub.innerHTML = html;
 }
 
 // =====================================================
 // EXPORT RELEVE
 // =====================================================
 window.exporterReleve = function () {
-  if (!sessionActuelle || !sessions[sessionActuelle]) return alert("Aucune session");
+  if (!sessionActuelle || !sessions[sessionActuelle]) return alert("Aucune session selectionnee");
   const s = sessions[sessionActuelle];
   const quota = s.quota || 0;
-  let txt = `RELEVE CEAI — ${sessionActuelle}\n========================================\nQuota: ${quota.toLocaleString("fr-FR")} F\nCapital: ${(s.capitalMois||0).toLocaleString("fr-FR")} F\n\n`;
+  let texte = `RELEVE CEAI — ${sessionActuelle}\n========================================\nQuota: ${quota.toLocaleString("fr-FR")} F CFA\nCapital total: ${(s.capital||0).toLocaleString("fr-FR")} F CFA\n\n`;
+  
   membres.forEach(m => {
-    const verse = s.versements[m.id]||0, reste = Math.max(0, quota - verse);
-    txt += `- ${m.nom} : ${verse.toLocaleString("fr-FR")} F ${reste?`(Reste: ${reste.toLocaleString("fr-FR")} F)`:"PAYE"}\n`;
+    const verse = s.versements[m.id] || 0;
+    const reste = Math.max(0, quota - verse);
+    texte += `- ${m.nom} : ${verse.toLocaleString("fr-FR")} F CFA ${reste > 0 ? `(Reste: ${reste.toLocaleString("fr-FR")} F CFA)` : "PAYE"}\n`;
   });
-  const blob = new Blob([txt], {type:"text/plain"});
-  const a = document.createElement("a");
-  a.href=URL.createObjectURL(blob); a.download=`CEAI-${sessionActuelle}.txt`; a.click();
+
+  if (s.depenses?.length) {
+    texte += "\n--- DEPENSES ---\n";
+    s.depenses.forEach(d => texte += `- ${d.projet} : ${d.montant.toLocaleString("fr-FR")} F CFA (${d.date})\n`);
+  }
+
+  const fichier = new Blob([texte], { type: "text/plain" });
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(fichier);
+  lien.download = `CEAI-Releve-${sessionActuelle.replace(/\s+/g, '-')}.txt`;
+  lien.click();
 };
     
