@@ -509,12 +509,6 @@ window.publier = async function () {
   mettreAJourPublicationsAccueil();
 };
 
-  } catch (erreur) {
-    console.error("Erreur publication :", erreur);
-    alert("Echec de la publication : " + erreur.message);
-  }
-};
-
 // =====================================================
 // MISES A JOUR AFFICHAGE
 // =====================================================
