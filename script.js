@@ -452,30 +452,46 @@ window.publier = async function () {
 
   const fichier = document.getElementById("fichierPub").files[0];
   const description = document.getElementById("descriptionPub").value.trim();
-  if (!fichier && !description) return alert("Ajoutez un fichier ou un texte");
-
-  let urlFichier = null;
-  if (fichier) {
-    if (fichier.size > 8 * 1024 * 1024) return alert("Fichier de 8 Mo maximum");
-    const refFichier = storageRef(storage, `publications/${Date.now()}_${fichier.name}`);
-    const resultat = await uploadBytes(refFichier, fichier);
-    urlFichier = await getDownloadURL(resultat.ref);
+  
+  if (!fichier && !description) {
+    return alert("Veuillez selectionner un fichier OU ecrire une description");
   }
 
-  publications.unshift({
-    id: Date.now(),
-    auteur: utilisateurCourant?.email || "Anonyme",
-    date: new Date().toLocaleString("fr-FR"),
-    url: urlFichier,
-    type: fichier?.type || null,
-    description
-  });
-  await sauvegarder("publications");
-  
-  document.getElementById("fichierPub").value = "";
-  document.getElementById("descriptionPub").value = "";
-  alert("Publie avec succes");
-  mettreAJourPublicationsAccueil();
+  try {
+    let urlFichier = null;
+
+    if (fichier) {
+      if (fichier.size > 8 * 1024 * 1024) {
+        return alert("Fichier trop volumineux (8 Mo maximum)");
+      }
+      const cheminFichier = "publications/" + Date.now() + "_" + fichier.name;
+      const refStockage = storageRef(storage, cheminFichier);
+      const resultat = await uploadBytes(refStockage, fichier);
+      urlFichier = await getDownloadURL(resultat.ref);
+    }
+
+    publications.unshift({
+      id: Date.now(),
+      auteur: utilisateurCourant?.email || "Anonyme",
+      date: new Date().toLocaleString("fr-FR"),
+      url: urlFichier,
+      type: fichier?.type || null,
+      description: description
+    });
+
+    await sauvegarder("publications");
+    
+    // Reinitialiser le formulaire
+    document.getElementById("fichierPub").value = "";
+    document.getElementById("descriptionPub").value = "";
+    
+    alert("Publication reussie !");
+    mettreAJourPublicationsAccueil();
+
+  } catch (erreur) {
+    console.error("Erreur publication :", erreur);
+    alert("Echec de la publication : " + erreur.message);
+  }
 };
 
 // =====================================================
