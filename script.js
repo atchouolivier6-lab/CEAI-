@@ -452,41 +452,62 @@ window.publier = async function () {
 
   const fichier = document.getElementById("fichierPub").files[0];
   const description = document.getElementById("descriptionPub").value.trim();
-  
-  if (!fichier && !description) {
-    return alert("Veuillez selectionner un fichier OU ecrire une description");
+  if (!fichier && !description) return alert("Ajoutez un fichier ou un texte");
+
+  let urlFichier = null;
+  let typeFichier = null;
+
+  if (fichier) {
+    if (fichier.size > 100 * 1024 * 1024) return alert("Fichier trop grand (100 Mo maximum)");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", fichier);
+      formData.append("upload_preset", "ml_default");
+      formData.append("cloud_name", "tlp5kk6r");
+
+      let typeUpload = fichier.type.startsWith("video") ? "video" : "image";
+
+      const reponse = await fetch(
+        "https://api.cloudinary.com/v1_1/tlp5kk6r/" + typeUpload + "/upload",
+        {
+          method: "POST",
+          body: formData
+        }
+      );
+
+      const resultat = await reponse.json();
+
+      if (resultat.error) {
+        alert("Erreur upload : " + resultat.error.message);
+        return;
+      }
+
+      urlFichier = resultat.secure_url;
+      typeFichier = fichier.type;
+
+    } catch (erreur) {
+      alert("Erreur lors de l'envoi du fichier. Verifiez votre connexion.");
+      return;
+    }
   }
 
-  try {
-    let urlFichier = null;
+  publications.unshift({
+    id: Date.now(),
+    auteur: utilisateurCourant?.email || "Anonyme",
+    date: new Date().toLocaleString("fr-FR"),
+    url: urlFichier,
+    type: typeFichier,
+    description
+  });
 
-    if (fichier) {
-      if (fichier.size > 8 * 1024 * 1024) {
-        return alert("Fichier trop volumineux (8 Mo maximum)");
-      }
-      const cheminFichier = "publications/" + Date.now() + "_" + fichier.name;
-      const refStockage = storageRef(storage, cheminFichier);
-      const resultat = await uploadBytes(refStockage, fichier);
-      urlFichier = await getDownloadURL(resultat.ref);
-    }
+  await sauvegarder("publications");
 
-    publications.unshift({
-      id: Date.now(),
-      auteur: utilisateurCourant?.email || "Anonyme",
-      date: new Date().toLocaleString("fr-FR"),
-      url: urlFichier,
-      type: fichier?.type || null,
-      description: description
-    });
-
-    await sauvegarder("publications");
-    
-    // Reinitialiser le formulaire
-    document.getElementById("fichierPub").value = "";
-    document.getElementById("descriptionPub").value = "";
-    
-    alert("Publication reussie !");
-    mettreAJourPublicationsAccueil();
+  document.getElementById("fichierPub").value = "";
+  document.getElementById("descriptionPub").value = "";
+  alert("Publie avec succes !");
+  mettreAJourPublicationsAccueil();
+};
 
   } catch (erreur) {
     console.error("Erreur publication :", erreur);
