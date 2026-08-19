@@ -28,7 +28,7 @@
       <div id="inscriptionForm" class="cache">
         <input type="text" id="inscNom" placeholder="Nom et Prénom" />
         <input type="email" id="inscEmail" placeholder="Adresse email" />
-        <input type="password" id="inscMdp" placeholder="Choisissez un mot de passe (6 caractères minimum)" />
+        <input type="password" id="inscMdp" placeholder="Choisissez un mot de passe (6 caracteres minimum)" />
         <button onclick="sInscrire()">Valider mon inscription</button>
         <p class="bas-form">Déjà un compte ? <a href="#" onclick="basculerConnexion()">Se connecter</a></p>
         <p id="inscErreur" class="erreur"></p>
@@ -36,7 +36,7 @@
     </div>
   </div>
 
-  <!-- === VÉRIFICATION ACCÈS ADMINISTRATEUR === -->
+  <!-- === VERIFICATION ACCES ADMINISTRATEUR === -->
   <div id="adminVerifScreen" class="login-screen depenses-screen cache">
     <div class="login-box">
       <h2>Accès Administrateur</h2>
@@ -50,7 +50,7 @@
   <!-- === SITE PRINCIPAL === -->
   <div id="sitePrincipal" class="site-principal cache">
 
-    <!-- EN-TÊTE -->
+    <!-- EN-TETE -->
     <header class="entete">
       <div class="container entete-contenu">
         <div class="logo-gauche">
@@ -67,7 +67,7 @@
       </div>
     </header>
 
-    <!-- MENU DÉROULANT -->
+    <!-- MENU DEROULANT -->
     <nav class="menu-principal">
       <div class="container">
         <div class="menu-deroulant">
@@ -89,7 +89,7 @@
 
     <main class="container">
 
-      <!-- === PAGE D'ACCUEIL — LECTURE SEULE === -->
+      <!-- === PAGE D'ACCUEIL === -->
       <section id="sec-accueil" class="section active">
         <h2>Bienvenue sur CEAI</h2>
         <div class="cartes-resume">
@@ -118,10 +118,11 @@
         </div>
       </section>
 
-      <!-- === AJOUTER UN MEMBRE — UNIQUEMENT ADMIN === -->
+      <!-- === AJOUTER UN MEMBRE === -->
       <section id="sec-admin-membres" class="section">
         <h2>Ajouter un membre</h2>
-        <p class="note zone-admin cache">Pas de limite de membres · Le système détecte automatiquement les doublons</p>
+        <p class="note zone-public">Seul l'administrateur peut ajouter un nouveau membre.</p>
+        <p class="note zone-admin cache">Pas de limite de membres · Le système détecte automatiquement les doublons.</p>
         <div class="formulaire zone-admin cache">
           <h3>Enregistrer un nouveau membre</h3>
           <input type="text" id="nomMembreAdmin" placeholder="Nom et Prénom *" />
@@ -129,13 +130,12 @@
           <input type="text" id="dateAdhesionAdmin" placeholder="Date d'adhésion (ex: 15/01/2026)" />
           <button onclick="ajouterMembreAdmin()">Enregistrer le membre</button>
         </div>
-        <p class="note">Cette partie est réservée à l'administrateur.</p>
       </section>
 
-      <!-- === ADHÉSION — PUBLIQUE === -->
+      <!-- === ADHESION === -->
       <section id="sec-adherer" class="section">
         <h2>Adhérer à CEAI</h2>
-        <p class="note">Remplissez le formulaire pour rejoindre l'association</p>
+        <p class="note">Remplissez le formulaire pour rejoindre l'association.</p>
         <div class="formulaire">
           <h3>Vos informations</h3>
           <input type="text" id="nomAdherent" placeholder="Nom et Prénom *" />
@@ -149,17 +149,18 @@
       <!-- === SUIVI DES COTISATIONS === -->
       <section id="sec-cotisations" class="section">
         <h2>Suivi des cotisations</h2>
+        <p class="note zone-public">Seul l'administrateur peut sélectionner un membre et enregistrer un versement.</p>
 
-        <!-- SESSION ET QUOTA — UNIQUEMENT ADMIN -->
+        <!-- SESSION ET QUOTA — ADMIN SEUL -->
         <div class="formulaire zone-admin cache">
           <h3>Session du mois</h3>
-          <input type="text" id="sessionMois" placeholder="Entrer la session du mois (ex: Septembre 2026)" />
+          <input type="text" id="sessionMois" placeholder="Entrez la session du mois (ex: Septembre 2026)" />
           <input type="number" id="quotaMois" placeholder="Quota mensuel (minimum 500 F)" min="500" />
           <button onclick="changerSession()">Valider la session et le quota</button>
         </div>
 
-        <!-- ENREGISTRER VERSEMENT --- ACCESSIBLE -->
-        <div class="formulaire">
+        <!-- ENREGISTRER VERSEMENT — ADMIN SEUL -->
+        <div class="formulaire zone-admin cache">
           <h3>Enregistrer un versement</h3>
           <select id="selectionMembreCot">
             <option value="">-- Choisir un membre --</option>
@@ -168,10 +169,14 @@
           <button onclick="enregistrerVersement()">Enregistrer le versement</button>
           
           <div style="margin-top:1.5rem; display:flex; gap:0.8rem; flex-wrap:wrap;">
-            <button class="zone-admin cache" onclick="ouvrirDepenses()">Dépenses & Réalisations</button>
-            <button class="btn-cloturer zone-admin cache" onclick="demanderCloture()">Clôturer définitivement ce mois</button>
-            <button onclick="exporterReleve()">Télécharger le relevé</button>
+            <button onclick="ouvrirDepenses()">Dépenses & Réalisations</button>
+            <button class="btn-cloturer" onclick="demanderCloture()">Clôturer définitivement ce mois</button>
           </div>
+        </div>
+
+        <!-- BOUTON TELECHARGER — TOUS -->
+        <div class="formulaire">
+          <button onclick="exporterReleve()">Télécharger le relevé</button>
         </div>
         
         <div class="tableau-conteneur">
@@ -179,7 +184,7 @@
           <div id="tableauVersements"></div>
         </div>
 
-        <!-- DÉPENSES & RÉALISATIONS --- UNIQUEMENT ADMIN -->
+        <!-- DEPENSES -->
         <div id="blocDepenses" class="cache zone-admin">
           <h3>Dépenses & Réalisations</h3>
           <div class="formulaire">
@@ -190,12 +195,12 @@
           <div id="listeDepenses"></div>
         </div>
 
-        <!-- NOTIFICATIONS --- ACCESSIBLE -->
+        <!-- NOTIFICATIONS -->
         <h3 style="margin-top:2rem;">Derniers paiements enregistrés</h3>
         <div id="notificationsPaiement"></div>
       </section>
 
-      <!-- === FAIRE MON PAIEMENT — PUBLIQUE === -->
+      <!-- === PAIEMENT === -->
       <section id="sec-paiement" class="section">
         <h2>Faire mon paiement</h2>
         <div class="formulaire">
@@ -208,8 +213,8 @@
         <div id="infosPaiement" class="message-info cache">
           <p><strong>Effectuez votre virement vers l'un des comptes suivants :</strong></p>
           <div class="comptes-paiement">
-            <p>MTN Bénin : <a href="tel:+2290167780104" class="lien-paiement">+229 0167780104</a></p>
-            <p>Moov Bénin : <a href="tel:+2290158040055" class="lien-paiement">+229 0158040055</a></p>
+            <p>MTN Bénin : +229 0167780104</p>
+            <p>Moov Bénin : +229 0167780104</p>
           </div>
           <p style="margin-top:0.8rem;">Après paiement, revenez sur le site pour que l'administration valide votre versement.</p>
           <button onclick="confirmerPaiementDeclare()" style="margin-top:1rem;">J'ai effectué mon paiement</button>
@@ -217,30 +222,56 @@
         <p id="msgPaiement" class="message-info"></p>
       </section>
 
-      <!-- === ESPACE DE PUBLICATION — UNIQUEMENT ADMIN === -->
+      <!-- === PUBLICATION === -->
       <section id="sec-publication" class="section">
         <h2>Espace de publication</h2>
-        <p class="note zone-admin cache">Publier des photos et vidéos de nos manifestations et réalisations</p>
+        <p class="note zone-public">Seul l'administrateur peut publier des nouvelles et photos.</p>
+        <p class="note zone-admin cache">Publier des photos et videos de nos manifestations et réalisations.</p>
         <div class="formulaire zone-admin cache">
           <input type="file" id="fichierPub" accept="image/*,video/mp4,video/webm" />
           <textarea id="descriptionPub" placeholder="Description de la publication..." rows="4"></textarea>
           <button onclick="publier()">Publier</button>
         </div>
-        <p class="note">Cette partie est réservée à l'administrateur.</p>
         <h3>Publications enregistrées</h3>
         <div id="listePublications"></div>
       </section>
 
-      <!-- === À PROPOS DE CEAI — PUBLIQUE === -->
+      <!-- === A PROPOS === -->
       <section id="sec-apropos" class="section">
         <h2>À propos de CEAI</h2>
         <div class="bloc-propos">
           <h3>Présentation</h3>
           <p>CEAI — Connaissance Entre Amis Intimes est une association fondée sur les valeurs de l'amitié, la confiance, la rigueur et l'engagement. Nous nous réunissons dans un but unique : épargner ensemble, construire un capital commun et réaliser dans un avenir proche des projets d'envergure qui feront de nous une société solide et reconnue.</p>
-          <p>Ce site a été créé pour permettre à chaque membre de suivre ses cotisations, de consulter l'historique des versements et des réalisations, et de garantir une transparence totale dans la gestion commune. Chaque génération à venir pourra continuer cette œuvre, car nous bâtissons pour le long terme.</p>
+          <p>Ce site a été créé pour permettre à chaque membre de suivre ses cotisations, de consulter l'historique des versements et des réalisations, et de garantir une transparence totale dans la gestion commune. Chaque génération à venir pourra continuer cette oeuvre, car nous bâtissons pour le long terme.</p>
           
           <h3 style="margin-top:2rem;">Membres fondateurs de CEAI</h3>
-          <div id="listeFondateurs" class="fondateurs-grille"></div>
+          <div id="listeFondateurs" class="fondateurs-grille">
+            <div class="carte-fondateur">
+              <img src="https://i.postimg.cc/qtM4Gr2B/3a4071e1-3637-438a-97df-e94ff9aca194.jpg" alt="ATCHOU Basile" />
+              <h4>ATCHOU Basile</h4>
+              <p class="contact-fondateur">+229 0191156651</p>
+            </div>
+            <div class="carte-fondateur">
+              <img src="https://i.postimg.cc/V0XR63GX/16dd27af-3399-43c6-9086-fa783204b698.jpg" alt="KASSEIGNE Charles" />
+              <h4>KASSEIGNE Charles</h4>
+              <p class="contact-fondateur">+225 0160095674</p>
+            </div>
+            <div class="carte-fondateur">
+              <img src="https://i.postimg.cc/f36qRjWM/a4ced9b4-e3a7-4c98-a60d-62d706609cc5.jpg" alt="ATCHOU Jules" />
+              <h4>ATCHOU Jules</h4>
+              <p class="contact-fondateur">+225 0585790106</p>
+            </div>
+            <div class="carte-fondateur">
+              <img src="https://i.postimg.cc/3yBWK9FC/1001f76a-8b67-478f-ae52-a95fab3710bd.jpg" alt="AKPA Emile" />
+              <h4>AKPA Emile</h4>
+              <p class="contact-fondateur">+229 0150290643</p>
+            </div>
+            <div class="carte-fondateur">
+              <img src="https://i.postimg.cc/zLWS0m58/0a96c591-7c11-42cb-9fbf-b4552ac75a12.jpg" alt="ATCHOU Olivier" />
+              <h4>ATCHOU Olivier</h4>
+              <p class="contact-fondateur">+229 0152353448</p>
+            </div>
+          </div>
 
           <p class="concepteur">Concepteur et fondateur du site : Atchou Olivier-Electricien Bâtiment</p>
         </div>
@@ -256,7 +287,7 @@
 
   </div>
 
-  <!-- === FIREBASE === -->
+  <!-- === FICHIER JAVASCRIPT === -->
   <script type="module" src="script.js"></script>
 </body>
-          </html>
+        </html>
