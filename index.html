@@ -28,7 +28,7 @@
       <div id="inscriptionForm" class="cache">
         <input type="text" id="inscNom" placeholder="Nom et Prénom" />
         <input type="email" id="inscEmail" placeholder="Adresse email" />
-        <input type="password" id="inscMdp" placeholder="Choisissez un mot de passe" />
+        <input type="password" id="inscMdp" placeholder="Choisissez un mot de passe (6 caractères minimum)" />
         <button onclick="sInscrire()">Valider mon inscription</button>
         <p class="bas-form">Déjà un compte ? <a href="#" onclick="basculerConnexion()">Se connecter</a></p>
         <p id="inscErreur" class="erreur"></p>
@@ -213,8 +213,8 @@
         <div id="infosPaiement" class="message-info cache">
           <p><strong>Effectuez votre virement vers l'un des comptes suivants :</strong></p>
           <div class="comptes-paiement">
-            <p>🟡 MTN Bénin : <a href="tel:+2290167780104" class="lien-paiement">+229 0167780104</a></p>
-            <p>🔵 Moov Bénin : <a href="tel:+2290158040055" class="lien-paiement">+229 0158040055</a></p>
+            <p>MTN Bénin : <a href="tel:+2290167780104" class="lien-paiement">+229 0167780104</a></p>
+            <p>Moov Bénin : <a href="tel:+2290158040055" class="lien-paiement">+229 0158040055</a></p>
           </div>
           <p style="margin-top:0.8rem;">Après paiement, revenez sur le site pour que l'administration valide votre versement.</p>
           <button onclick="confirmerPaiementDeclare()" style="margin-top:1rem;">J'ai effectué mon paiement</button>
@@ -244,9 +244,7 @@
           <p>Ce site a été créé pour permettre à chaque membre de suivre ses cotisations, de consulter l'historique des versements et des réalisations, et de garantir une transparence totale dans la gestion commune. Chaque génération à venir pourra continuer cette œuvre, car nous bâtissons pour le long terme.</p>
           
           <h3 style="margin-top:2rem;">Membres fondateurs de CEAI</h3>
-          <div id="listeFondateurs" class="fondateurs-grille">
-            <!-- Rempli par le JavaScript -->
-          </div>
+          <div id="listeFondateurs" class="fondateurs-grille"></div>
 
           <p class="concepteur">Concepteur et fondateur du site : Atchou Olivier-Electricien Bâtiment</p>
         </div>
@@ -262,6 +260,7 @@
 
   </div>
 
-  <script src="script.js"></script>
+  <!-- === FIREBASE === -->
+  <script type="module" src="script.js"></script>
 </body>
         </html>
