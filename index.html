@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CEAI — Connaissance Entre Amis Intimes</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- === ÉCRAN DE CONNEXION === -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-box">
+      <div class="login-logo">
+        <img src="https://i.postimg.cc/7CJbtf9j/logo.png" alt="Logo CEAI" />
+      </div>
+      <h2>Connexion Espace CEAI</h2>
+      <p class="sous-texte">Connaissance Entre Amis Intimes</p>
+      <input type="password" id="passwordInput" placeholder="Entrez le mot de passe" />
+      <button onclick="seConnecter()">Se connecter</button>
+      <p id="erreurMdp" class="erreur"></p>
+    </div>
+  </div>
+
+  <!-- === ÉCRAN VÉRIFICATION DÉPENSES === -->
+  <div id="verifDepensesScreen" class="login-screen depenses-screen cache">
+    <div class="login-box">
+      <h2>Accès Dépenses & Réalisations</h2>
+      <p class="sous-texte">Partie réservée aux administrateurs</p>
+      <input type="password" id="mdpDepenses" placeholder="Mot de passe administrateur" />
+      <button onclick="verifierDepenses()">Accéder</button>
+      <p id="erreurDep" class="erreur"></p>
+      <button class="btn-retour" onclick="fermerVerifDepenses()">Retour</button>
+    </div>
+  </div>
+
+  <!-- === SITE PRINCIPAL === -->
+  <div id="sitePrincipal" class="site-principal cache">
+
+    <!-- EN-TÊTE -->
+    <header class="entete">
+      <div class="container entete-contenu">
+        <div class="logo-gauche">
+          <img src="https://i.postimg.cc/7CJbtf9j/logo.png" alt="Logo CEAI" class="logo-ceai" />
+        </div>
+        <div class="titre-centre">
+          <h1>CONNAISSANCE ENTRE AMIS INTIMES</h1>
+          <p class="slogan">Ensemble, on va plus loin</p>
+          <p class="valeurs">Engagement — Rigueur — Amitié</p>
+        </div>
+        <div class="photo-droite">
+          <img src="https://i.postimg.cc/dZw10nF2/fondateurs.jpg" alt="Les fondateurs" class="img-fondateurs" />
+        </div>
+      </div>
+    </header>
+
+    <!-- MENU DÉROULANT -->
+    <nav class="menu-principal">
+      <div class="container">
+        <div class="menu-deroulant">
+          <button class="btn-menu" onclick="toggleMenu()">MENU — Sélectionner une rubrique</button>
+          <div id="optionsMenu" class="options-cachees">
+            <a href="#" onclick="afficherSection('accueil')">Tableau de bord</a>
+            <a href="#" onclick="afficherSection('admin-membres')">Ajouter un membre (Admin)</a>
+            <a href="#" onclick="afficherSection('adherer')">Adhérer à CEAI</a>
+            <a href="#" onclick="afficherSection('cotisations')">Suivi des cotisations</a>
+            <a href="#" onclick="afficherSection('paiement')">Faire mon paiement</a>
+            <a href="#" onclick="afficherSection('apropos')">À propos de CEAI</a>
+            <a href="#" onclick="deconnexion()">Se déconnecter</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container">
+
+      <!-- === TABLEAU DE BORD === -->
+      <section id="sec-accueil" class="section active">
+        <h2>Tableau de bord</h2>
+        <div class="cartes-resume">
+          <div class="carte">
+            <h3>Capital Global Épargné</h3>
+            <p class="gros-chiffre" id="capitalGlobal">0 F CFA</p>
+          </div>
+          <div class="carte">
+            <h3>Membres Actifs</h3>
+            <p class="gros-chiffre"><span id="nbMembres">0</span> / 10</p>
+          </div>
+          <div class="carte">
+            <h3>Session du mois</h3>
+            <p class="gros-chiffre" id="sessionEnCours">—</p>
+          </div>
+        </div>
+        <div class="boite-info">
+          <p><strong>Informations :</strong> Idée née en juin 2026 · Suivi officiel depuis janvier 2026 · Cotisation : 2 000 F / membre / mois</p>
+          <p><em>Des amis, des projets, un avenir.</em></p>
+        </div>
+      </section>
+
+      <!-- === AJOUTER UN MEMBRE (ADMIN) === -->
+      <section id="sec-admin-membres" class="section">
+        <h2>Ajouter un membre (Administration)</h2>
+        <p class="note">Maximum 10 membres · Le système détecte automatiquement les doublons</p>
+        <div class="formulaire">
+          <h3>Enregistrer un nouveau membre</h3>
+          <input type="text" id="nomMembreAdmin" placeholder="Nom et Prénom *" />
+          <input type="tel" id="telMembreAdmin" placeholder="Numéro de téléphone" />
+          <input type="text" id="dateAdhesionAdmin" placeholder="Date d'adhésion (ex: 15/01/2026)" />
+          <button onclick="ajouterMembreAdmin()">Enregistrer le membre</button>
+        </div>
+        <div class="liste-conteneur">
+          <h3>Liste des membres</h3>
+          <div id="listeMembresAdmin"></div>
+        </div>
+      </section>
+
+      <!-- === ADHÉSION === -->
+      <section id="sec-adherer" class="section">
+        <h2>Adhérer à CEAI</h2>
+        <p class="note">Remplissez le formulaire pour rejoindre l'association</p>
+        <div class="formulaire">
+          <h3>Vos informations</h3>
+          <input type="text" id="nomAdherent" placeholder="Nom et Prénom *" />
+          <input type="tel" id="telAdherent" placeholder="Numéro de téléphone" />
+          <input type="text" id="dateAdhesion" placeholder="Date d'adhésion (ex: 15/01/2026)" />
+          <button onclick="soumettreAdhesion()">Valider mon adhésion</button>
+        </div>
+        <p id="msgAdhesion" class="message-info"></p>
+      </section>
+
+      <!-- === SUIVI DES COTISATIONS === -->
+      <section id="sec-cotisations" class="section">
+        <h2>Suivi des cotisations</h2>
+        <div class="formulaire">
+          <h3>Session du mois</h3>
+          <input type="text" id="sessionMois" placeholder="Entrer la session du mois (ex: Septembre 2030)" />
+          <button onclick="changerSession()">Valider la session</button>
+          
+          <h3 style="margin-top:1.5rem;">Enregistrer un versement</h3>
+          <select id="selectionMembreCot">
+            <option value="">-- Choisir un membre --</option>
+          </select>
+          <input type="number" id="montantVerse" placeholder="Montant versé (F CFA)" min="0" />
+          <button onclick="enregistrerVersement()">Enregistrer le versement</button>
+          
+          <div style="margin-top:1.5rem; display:flex; gap:0.8rem; flex-wrap:wrap;">
+            <button onclick="ouvrirDepenses()">Dépenses & Réalisations</button>
+            <button class="btn-cloturer" onclick="cloturerMois()">Clôturer définitivement ce mois</button>
+            <button onclick="exporterReleve()">Télécharger le relevé</button>
+          </div>
+        </div>
+        
+        <div class="tableau-conteneur">
+          <h3 id="titreSession">Tableau des cotisations — Aucune session sélectionnée</h3>
+          <div id="tableauVersements"></div>
+        </div>
+
+        <!-- Dépenses & Réalisations (masqué par défaut) -->
+        <div id="blocDepenses" class="cache">
+          <h3>Dépenses & Réalisations</h3>
+          <div class="formulaire">
+            <input type="number" id="montantDepense" placeholder="Somme dépensée (F CFA)" min="0" />
+            <input type="text" id="projetConcerne" placeholder="Projet ou motif de la dépense" />
+            <button onclick="enregistrerDepense()">Enregistrer la dépense</button>
+          </div>
+          <div id="listeDepenses"></div>
+        </div>
+
+        <!-- Mois clôturés -->
+        <div style="margin-top:2rem;">
+          <h3>Mois clôturés</h3>
+          <div id="moisClotures"></div>
+        </div>
+      </section>
+
+      <!-- === FAIRE MON PAIEMENT === -->
+      <section id="sec-paiement" class="section">
+        <h2>Faire mon paiement</h2>
+        <div class="formulaire">
+          <input type="text" id="nomPayeur" placeholder="Nom et Prénom *" />
+          <input type="tel" id="whatsappPayeur" placeholder="Numéro WhatsApp" />
+          <input type="text" id="datePaiement" placeholder="Date du paiement" />
+          <input type="number" id="montantAPayer" placeholder="Montant à verser (F CFA)" min="0" />
+          <button onclick="afficherComptesPaiement()">Payer</button>
+        </div>
+        <div id="infosPaiement" class="message-info cache">
+          <p><strong>Effectuez votre virement vers l'un des comptes suivants :</strong></p>
+          <div class="comptes-paiement">
+            <p>🟡 <strong>MTN Bénin :</strong> +229 0167780104</p>
+            <p>🔵 <strong>Moov Bénin :</strong> +229 0158040055</p>
+          </div>
+          <p>Après paiement, revenez sur le site pour que l'administration valide votre versement.</p>
+        </div>
+      </section>
+
+            <!-- === À PROPOS DE CEAI === -->
+      <section id="sec-apropos" class="section">
+        <h2>À propos de CEAI</h2>
+        <div class="bloc-propos">
+          <h3>Présentation</h3>
+          <p>CEAI — Connaissance Entre Amis Intimes est une association fondée sur les valeurs de l'amitié, la confiance, la rigueur et l'engagement. Nous nous réunissons dans un but unique : épargner ensemble, construire un capital commun et réaliser dans un avenir proche des projets d'envergure qui feront de nous une société solide et reconnue.</p>
+          <p>Ce site a été créé pour permettre à chaque membre de suivre ses cotisations, de consulter l'historique des versements et des réalisations, et de garantir une transparence totale dans la gestion commune. Chaque génération à venir pourra continuer cette œuvre, car nous bâtissons pour le long terme.</p>
+          
+          <h3 style="margin-top:2rem;">Membres fondateurs de CEAI</h3>
+          <p class="note">Téléversez une photo pour chaque membre (format recommandé : portrait carré)</p>
+          <div id="conseilMembres">
+            <div class="bloc-membre-conseil">
+              <img src="https://via.placeholder.com/70?text=AB" alt="Photo" id="photo-1" />
+              <div><strong>ATCHOU Basile</strong></div>
+            </div>
+            <div class="bloc-membre-conseil">
+              <img src="https://via.placeholder.com/70?text=KC" alt="Photo" id="photo-2" />
+              <div><strong>KASSEIGNE Charles</strong></div>
+            </div>
+            <div class="bloc-membre-conseil">
+              <img src="https://via.placeholder.com/70?text=AJ" alt="Photo" id="photo-3" />
+              <div><strong>ATCHOU Jules</strong></div>
+            </div>
+            <div class="bloc-membre-conseil">
+              <img src="https://via.placeholder.com/70?text=AE" alt="Photo" id="photo-4" />
+              <div><strong>AKPA Emile</strong></div>
+            </div>
+            <div class="bloc-membre-conseil">
+              <img src="https://via.placeholder.com/70?text=AO" alt="Photo" id="photo-5" />
+              <div><strong>ATCHOU Olivier</strong></div>
+            </div>
+          </div>
+          <p class="note" style="margin-top:0.5rem;">Cliquez sur le bouton ci-dessous pour ajouter ou modifier une photo :</p>
+          <div class="formulaire" style="margin-top:0.5rem;">
+            <select id="selectionFondateur">
+              <option value="">-- Sélectionner un fondateur --</option>
+              <option value="1">ATCHOU Basile</option>
+              <option value="2">KASSEIGNE Charles</option>
+              <option value="3">ATCHOU Jules</option>
+              <option value="4">AKPA Emile</option>
+              <option value="5">ATCHOU Olivier</option>
+            </select>
+            <input type="file" id="photoFondateur" accept="image/*" onchange="chargerPhotoFondateur(event)" />
+            <button onclick="enregistrerPhotoFondateur()">Enregistrer la photo</button>
+          </div>
+
+          <p class="concepteur">Concepteur et fondateur du site : Atchou Olivier-Electricien Bâtiment</p>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="pied-page">
+      <div class="container">
+        <p>&copy; 2026 CEAI — Connaissance Entre Amis Intimes · Ensemble, on va plus loin · Engagement — Rigueur — Amitié</p>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+  </html>
