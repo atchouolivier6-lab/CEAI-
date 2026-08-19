@@ -1,75 +1,270 @@
-// === MOTS DE PASSE ===
-const MOT_DE_PASSE = "ceai2026";
+// =====================================================
+// CONFIGURATION FIREBASE
+// =====================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+import { 
+  getAuth, createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, signOut, 
+  onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-auth.js";
+import { 
+  getFirestore, doc, setDoc, getDoc, 
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCLLaCYpJpuZIWLALs3YxTf_-WqB4nP03Y",
+  authDomain: "ceai-5ff2a.firebaseapp.com",
+  databaseURL: "https://ceai-5ff2a-default-rtdb.firebaseio.com",
+  projectId: "ceai-5ff2a",
+  storageBucket: "ceai-5ff2a.firebasestorage.app",
+  messagingSenderId: "340494575762",
+  appId: "1:340494575762:web:fc6e538d64c97a67651e4b"
+};
+
+// Initialisation Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// =====================================================
+// PARAMETRES
+// =====================================================
 const MOT_DE_PASSE_ADMIN = "ceaiadmin2026";
-const MONTANT_COTISATION = 2000;
+const QUOTA_MIN = 500;
+const EMAIL_CONCEPTEUR = "atchou.olivier@exemple.com"; // Remplacez par votre email
 
-// === DONNÉES ===
-let membres = JSON.parse(localStorage.getItem("ceai_membres")) || [];
-let sessions = JSON.parse(localStorage.getItem("ceai_sessions")) || {};
-let sessionActuelle = localStorage.getItem("ceai_sessionActuelle") || "";
-let conseil = JSON.parse(localStorage.getItem("ceai_conseil")) || [];
-let depensesAutorise = false;
+// =====================================================
+// ETAT GLOBAL
+// =====================================================
+let utilisateurCourant = null;
+let membres = [];
+let sessions = {};
+let sessionActuelle = "";
+let publications = [];
+let notifications = [];
+let accesAdmin = false;
+let estConcepteur = false;
 
-// === CONNEXION ===
-function seConnecter() {
-  const saisi = document.getElementById("passwordInput").value;
-  if (saisi === MOT_DE_PASSE) {
-    document.getElementById("loginScreen").classList.add("cache");
+// Liste des fondateurs par defaut
+const FONDATEURS_DEFAUT = [
+  { id: 1, nom: "ATCHOU Basile", photo: "" },
+  { id: 2, nom: "KASSEIGNE Charles", photo: "" },
+  { id: 3, nom: "ATCHOU Jules", photo: "" },
+  { id: 4, nom: "AKPA Emile", photo: "" },
+  { id: 5, nom: "ATCHOU Olivier", photo: "" }
+];
+let fondateurs = [...FONDATEURS_DEFAUT];
+
+// =====================================================
+// SURVEILLER LA CONNEXION
+// =====================================================
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    utilisateurCourant = user;
+    estConcepteur = (user.email.toLowerCase() === EMAIL_CONCEPTEUR.toLowerCase());
+    document.getElementById("authScreen").classList.add("cache");
     document.getElementById("sitePrincipal").classList.remove("cache");
+    await chargerDonneesFirebase();
     mettreAJourAffichageGlobal();
+    mettreAJourVisibiliteAdmin();
   } else {
-    document.getElementById("erreurMdp").textContent = "Mot de passe incorrect";
+    utilisateurCourant = null;
+    document.getElementById("authScreen").classList.remove("cache");
+    document.getElementById("sitePrincipal").classList.add("cache");
   }
-}
-function deconnexion() {
-  document.getElementById("loginScreen").classList.remove("cache");
-  document.getElementById("sitePrincipal").classList.add("cache");
-  document.getElementById("passwordInput").value = "";
-  document.getElementById("erreurMdp").textContent = "";
-  document.getElementById("optionsMenu").classList.remove("ouvert");
+});
+
+// =====================================================
+// INSCRIPTION
+// =====================================================
+window.sInscrire = async function () {
+  const nom = document.getElementById("inscNom").value.trim();
+  const email = document.getElementById("inscEmail").value.trim();
+  const mdp = document.getElementById("inscMdp").value;
+  const erreur = document.getElementById("inscErreur");
+  
+  if (!nom || !email || mdp.length < 6) 
+    return erreur.textContent = "Remplissez tous les champs (6 caracteres minimum pour le mot de passe)";
+
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, mdp);
+    await setDoc(doc(db, "utilisateurs", cred.user.uid), {
+      nom, email, dateInscription: serverTimestamp()
+    });
+    erreur.textContent = "Compte cree ! Connexion en cours...";
+  } catch (e) {
+    erreur.textContent = traduireErreur(e.code);
+  }
+};
+
+// =====================================================
+// CONNEXION
+// =====================================================
+window.seConnecter = async function () {
+  const email = document.getElementById("connEmail").value.trim();
+  const mdp = document.getElementById("connMdp").value;
+  const erreur = document.getElementById("authErreur");
+  
+  try {
+    await signInWithEmailAndPassword(auth, email, mdp);
+  } catch (e) {
+    erreur.textContent = traduireErreur(e.code);
+  }
+};
+
+// =====================================================
+// TRADUCTION DES ERREURS
+// =====================================================
+function traduireErreur(code) {
+  const t = {
+    "auth/email-already-in-use": "Cet email est deja utilise",
+    "auth/user-not-found": "Aucun compte trouve avec cet email",
+    "auth/wrong-password": "Mot de passe incorrect",
+    "auth/invalid-email": "Adresse email invalide",
+    "auth/weak-password": "Mot de passe trop faible (6 caracteres minimum)"
+  };
+  return t[code] || "Erreur de connexion. Reessayez.";
 }
 
-// === ACCÈS DÉPENSES ===
-function ouvrirDepenses() {
-  document.getElementById("verifDepensesScreen").classList.remove("cache");
-}
-function fermerVerifDepenses() {
-  document.getElementById("verifDepensesScreen").classList.add("cache");
-  document.getElementById("mdpDepenses").value = "";
-}
-function verifierDepenses() {
-  const mdp = document.getElementById("mdpDepenses").value;
-  if (mdp === MOT_DE_PASSE_ADMIN) {
-    depensesAutorise = true;
-    fermerVerifDepenses();
-    document.getElementById("blocDepenses").classList.remove("cache");
-    afficherDepensesSession();
-  } else {
-    document.getElementById("erreurDep").textContent = "Accès refusé";
+// =====================================================
+// DECONNEXION
+// =====================================================
+window.deconnexion = async function () {
+  await signOut(auth);
+  accesAdmin = false;
+  document.getElementById("connEmail").value = "";
+  document.getElementById("connMdp").value = "";
+  document.getElementById("authErreur").textContent = "";
+  document.getElementById("inscErreur").textContent = "";
+  mettreAJourVisibiliteAdmin();
+};
+
+// =====================================================
+// CHARGER TOUTES LES DONNEES DEPUIS FIREBASE
+// =====================================================
+async function chargerDonneesFirebase() {
+  try {
+    const docMembres = await getDoc(doc(db, "ceai_data", "membres"));
+    if (docMembres.exists()) membres = docMembres.data().liste || [];
+
+    const docSessions = await getDoc(doc(db, "ceai_data", "sessions"));
+    if (docSessions.exists()) sessions = docSessions.data() || {};
+
+    const docSession = await getDoc(doc(db, "ceai_data", "session_actuelle"));
+    if (docSession.exists()) sessionActuelle = docSession.data().nom || "";
+
+    const docPubs = await getDoc(doc(db, "ceai_data", "publications"));
+    if (docPubs.exists()) publications = docPubs.data().liste || [];
+
+    const docNotifs = await getDoc(doc(db, "ceai_data", "notifications"));
+    if (docNotifs.exists()) notifications = docNotifs.data().liste || [];
+
+    const docFonds = await getDoc(doc(db, "ceai_data", "fondateurs"));
+    if (docFonds.exists() && docFonds.data().liste) fondateurs = docFonds.data().liste;
+
+    mettreAJourListeMembresSelect();
+  } catch (e) {
+    console.error("Erreur de chargement :", e);
   }
 }
 
-// === MENU ===
-function toggleMenu() {
+// =====================================================
+// SAUVEGARDER LES DONNEES
+// =====================================================
+async function sauvegarder(type) {
+  try {
+    switch(type) {
+      case "membres":
+        await setDoc(doc(db, "ceai_data", "membres"), { liste: membres }); break;
+      case "sessions":
+        await setDoc(doc(db, "ceai_data", "sessions"), sessions); break;
+      case "session_actuelle":
+        await setDoc(doc(db, "ceai_data", "session_actuelle"), { nom: sessionActuelle }); break;
+      case "publications":
+        await setDoc(doc(db, "ceai_data", "publications"), { liste: publications }); break;
+      case "notifications":
+        await setDoc(doc(db, "ceai_data", "notifications"), { liste: notifications }); break;
+      case "fondateurs":
+        await setDoc(doc(db, "ceai_data", "fondateurs"), { liste: fondateurs }); break;
+    }
+  } catch (e) {
+    console.error("Erreur de sauvegarde :", e);
+  }
+}
+
+// =====================================================
+// MENU ET NAVIGATION
+// =====================================================
+window.toggleMenu = function () {
   document.getElementById("optionsMenu").classList.toggle("ouvert");
-}
-function afficherSection(nom) {
+};
+
+window.afficherSection = function (nom) {
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
   document.getElementById(`sec-${nom}`).classList.add("active");
   document.getElementById("optionsMenu").classList.remove("ouvert");
   document.getElementById("blocDepenses").classList.add("cache");
-  depensesAutorise = false;
+  mettreAJourPublicationsAccueil();
+  afficherListeFondateurs();
+  mettreAJourVisibiliteAdmin();
+};
+
+window.basculerInscription = function () {
+  document.getElementById("connexionForm").classList.add("cache");
+  document.getElementById("inscriptionForm").classList.remove("cache");
+  document.getElementById("authTitre").textContent = "Inscription";
+};
+
+window.basculerConnexion = function () {
+  document.getElementById("inscriptionForm").classList.add("cache");
+  document.getElementById("connexionForm").classList.remove("cache");
+  document.getElementById("authTitre").textContent = "Connexion";
+};
+
+// =====================================================
+// GESTION DE LA VISIBILITE ADMINISTRATEUR
+// =====================================================
+function mettreAJourVisibiliteAdmin() {
+  const elementsAdmin = document.querySelectorAll(".zone-admin");
+  if (accesAdmin) {
+    elementsAdmin.forEach(el => el.classList.remove("cache"));
+  } else {
+    elementsAdmin.forEach(el => el.classList.add("cache"));
+  }
 }
 
-// === SAUVEGARDE ===
-function sauvegarder() {
-  localStorage.setItem("ceai_membres", JSON.stringify(membres));
-  localStorage.setItem("ceai_sessions", JSON.stringify(sessions));
-  localStorage.setItem("ceai_sessionActuelle", sessionActuelle);
-  localStorage.setItem("ceai_conseil", JSON.stringify(conseil));
-}
+// =====================================================
+// OUVERTURE ESPACE ADMINISTRATEUR
+// =====================================================
+window.ouvrirEspaceAdmin = function () {
+  document.getElementById("adminVerifScreen").classList.remove("cache");
+  document.querySelector("#adminVerifScreen h2").textContent = "Acces Administrateur";
+};
 
-// === DÉTECTION DE DOUBLONS ===
+window.fermerVerifAdmin = function () {
+  document.getElementById("adminVerifScreen").classList.add("cache");
+  document.getElementById("mdpAdminVerif").value = "";
+  document.getElementById("erreurAdmin").textContent = "";
+};
+
+window.verifierAdmin = async function () {
+  const saisi = document.getElementById("mdpAdminVerif").value;
+  if (saisi === MOT_DE_PASSE_ADMIN) {
+    accesAdmin = true;
+    fermerVerifAdmin();
+    mettreAJourVisibiliteAdmin();
+    alert("Acces administrateur valide. Vous pouvez gerer les membres et cloturer les mois.");
+  } else {
+    document.getElementById("erreurAdmin").textContent = "Acces refuse";
+  }
+};
+
+// =====================================================
+// AJOUTER UN MEMBRE — UNIQUEMENT ADMIN
+// =====================================================
 function membreExisteDeja(nom, tel) {
   return membres.some(m => 
     m.nom.trim().toLowerCase() === nom.trim().toLowerCase() || 
@@ -77,260 +272,316 @@ function membreExisteDeja(nom, tel) {
   );
 }
 
-// === AJOUTER MEMBRE PAR ADMIN ===
-function ajouterMembreAdmin() {
+window.ajouterMembreAdmin = async function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+
   const nom = document.getElementById("nomMembreAdmin").value.trim();
   const tel = document.getElementById("telMembreAdmin").value.trim();
   const date = document.getElementById("dateAdhesionAdmin").value.trim();
-  if (!nom) return alert("Veuillez saisir le nom et prénom");
-  if (membres.length >= 10) return alert("Maximum 10 membres atteint !");
-  if (membreExisteDeja(nom, tel)) return alert("ERREUR : Ce membre existe déjà !");
+  if (!nom) return alert("Saisissez le nom et prenom");
+  if (membreExisteDeja(nom, tel)) return alert("Ce membre existe deja");
+  
   membres.push({ id: Date.now(), nom, tel, dateAdhesion: date });
-  sauvegarder();
+  await sauvegarder("membres");
+  
   document.getElementById("nomMembreAdmin").value = "";
   document.getElementById("telMembreAdmin").value = "";
   document.getElementById("dateAdhesionAdmin").value = "";
   mettreAJourAffichageGlobal();
-  alert("Membre ajouté avec succès !");
-}
+  mettreAJourListeMembresSelect();
+  alert("Membre ajoute avec succes");
+};
 
-// === ADHÉSION PAR LE SITE ===
-function soumettreAdhesion() {
+// =====================================================
+// ADHESION PUBLIQUE
+// =====================================================
+window.soumettreAdhesion = async function () {
   const nom = document.getElementById("nomAdherent").value.trim();
   const tel = document.getElementById("telAdherent").value.trim();
   const date = document.getElementById("dateAdhesion").value.trim();
   const msg = document.getElementById("msgAdhesion");
-  if (!nom) return msg.textContent = "⚠️ Veuillez saisir votre nom et prénom";
-  if (membreExisteDeja(nom, tel)) return msg.textContent = "⚠️ Vous êtes déjà membre !";
-  if (membres.length >= 10) return msg.textContent = "⚠️ Maximum 10 membres atteint, l'adhésion est fermée.";
+  
+  if (!nom) return msg.textContent = "Saisissez votre nom et prenom";
+  if (membreExisteDeja(nom, tel)) return msg.textContent = "Vous etes deja membre";
+  
   membres.push({ id: Date.now(), nom, tel, dateAdhesion: date || new Date().toLocaleDateString("fr-FR") });
-  sauvegarder();
+  await sauvegarder("membres");
+  
   document.getElementById("nomAdherent").value = "";
   document.getElementById("telAdherent").value = "";
   document.getElementById("dateAdhesion").value = "";
+  msg.textContent = "Adhesion enregistree avec succes. Bienvenue a CEAI.";
   mettreAJourAffichageGlobal();
-  msg.textContent = "✅ Adhésion enregistrée avec succès ! Bienvenue à CEAI.";
-}
+  mettreAJourListeMembresSelect();
+};
 
-// === CHANGER DE SESSION ===
-function changerSession() {
+// =====================================================
+// SESSION ET QUOTA MENSUEL
+// =====================================================
+window.changerSession = async function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+
   const saisie = document.getElementById("sessionMois").value.trim();
-  if (!saisie) return alert("Veuillez indiquer la session du mois");
+  const quota = parseInt(document.getElementById("quotaMois").value);
+  
+  if (!saisie) return alert("Indiquez la session du mois");
+  if (!quota || quota < QUOTA_MIN) return alert(`Le quota doit etre au minimum ${QUOTA_MIN} F CFA`);
+  
   sessionActuelle = saisie;
   if (!sessions[sessionActuelle]) {
-    sessions[sessionActuelle] = { cloture: false, versements: {}, depenses: [] };
+    sessions[sessionActuelle] = { 
+      cloture: false, 
+      versements: {}, 
+      depenses: [],
+      quota: quota,
+      capitalMois: 0
+    };
+  } else {
+    if (sessions[sessionActuelle].cloture) return alert("Ce mois est cloture, modification impossible");
+    sessions[sessionActuelle].quota = quota;
   }
-  sauvegarder();
+  
+  await sauvegarder("session_actuelle");
+  await sauvegarder("sessions");
   mettreAJourAffichageSession();
-}
+};
 
-// === ENREGISTRER UN VERSEMENT ===
-function enregistrerVersement() {
+// =====================================================
+// ENREGISTRER UN VERSEMENT
+// =====================================================
+window.enregistrerVersement = async function () {
   if (!sessionActuelle) return alert("Validez d'abord la session du mois");
+  const s = sessions[sessionActuelle];
+  if (s.cloture) return alert("Ce mois est cloture, modification impossible");
+  
   const idMembre = document.getElementById("selectionMembreCot").value;
   const montant = parseInt(document.getElementById("montantVerse").value) || 0;
-  if (!idMembre) return alert("Sélectionnez un membre");
-  if (sessions[sessionActuelle].cloture) return alert("Ce mois est clôturé, modification impossible");
-  sessions[sessionActuelle].versements[idMembre] = (sessions[sessionActuelle].versements[idMembre] || 0) + montant;
-  sauvegarder();
+  if (!idMembre) return alert("Selectionnez un membre");
+  if (!montant || montant <= 0) return alert("Indiquez un montant valide");
+
+  const membre = membres.find(m => m.id == idMembre);
+  s.versements[idMembre] = (s.versements[idMembre] || 0) + montant;
+  s.capitalMois = (s.capitalMois || 0) + montant;
+
+  notifications.unshift({
+    id: Date.now(),
+    nom: membre ? membre.nom : "Membre inconnu",
+    montant: montant,
+    date: new Date().toLocaleString("fr-FR"),
+    session: sessionActuelle
+  });
+  if (notifications.length > 20) notifications.pop();
+
+  await sauvegarder("sessions");
+  await sauvegarder("notifications");
+  
   document.getElementById("montantVerse").value = "";
   mettreAJourAffichageSession();
-}
+  mettreAJourAffichageGlobal();
+};
 
-// === CLÔTURER LE MOIS ===
-function cloturerMois() {
-  if (!sessionActuelle) return alert("Aucune session sélectionnée");
-  if (!confirm("Confirmer la clôture définitive de ce mois ? Aucune modification ne sera plus possible.")) return;
+// =====================================================
+// CLOTURE DU MOIS — UNIQUEMENT ADMIN
+// =====================================================
+window.demanderCloture = function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+  if (!sessionActuelle) return alert("Aucune session selectionnee");
+  
+  if (confirm(`Confirmer la cloture definitive de « ${sessionActuelle} » ?\nLe capital sera sauvegarde et remis a zero au prochain mois.\nAucune modification ne sera plus possible.`)) {
+    cloturerMoisFinal();
+  }
+};
+
+async function cloturerMoisFinal() {
   sessions[sessionActuelle].cloture = true;
-  sauvegarder();
+  sessions[sessionActuelle].capitalMois = sessions[sessionActuelle].capitalMois || 0;
+  await sauvegarder("sessions");
+  
   mettreAJourAffichageSession();
+  alert(`Mois « ${sessionActuelle} » cloture. Le capital a ete sauvegarde.`);
 }
 
-// === ENREGISTRER UNE DÉPENSE ===
-function enregistrerDepense() {
-  if (!sessionActuelle) return alert("Validez d'abord la session du mois");
-  if (sessions[sessionActuelle].cloture) return alert("Mois clôturé");
+// =====================================================
+// DEPENSES
+// =====================================================
+window.enregistrerDepense = async function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+  if (!sessionActuelle) return alert("Validez d'abord la session");
+  const s = sessions[sessionActuelle];
+  if (s.cloture) return alert("Mois cloture");
+  
   const montant = parseInt(document.getElementById("montantDepense").value) || 0;
   const projet = document.getElementById("projetConcerne").value.trim();
   if (!montant || !projet) return alert("Remplissez tous les champs");
-  sessions[sessionActuelle].depenses.push({ montant, projet, date: new Date().toLocaleDateString("fr-FR") });
-  sauvegarder();
+  
+  s.depenses.push({ montant, projet, date: new Date().toLocaleDateString("fr-FR") });
+  await sauvegarder("sessions");
+  
   document.getElementById("montantDepense").value = "";
   document.getElementById("projetConcerne").value = "";
   afficherDepensesSession();
-}
+};
+
 function afficherDepensesSession() {
   if (!sessionActuelle || !sessions[sessionActuelle]) return;
   const liste = sessions[sessionActuelle].depenses;
   document.getElementById("listeDepenses").innerHTML = liste.length === 0
-    ? "<p>Aucune dépense enregistrée</p>"
+    ? "<p>Aucune depense enregistree</p>"
     : liste.map(d => `<div class="ligne-depense"><span>${d.projet}</span><span>${d.montant.toLocaleString("fr-FR")} F · ${d.date}</span></div>`).join("");
 }
 
-// === EXPORTER RELEVÉ ===
-function exporterReleve() {
-  if (!sessionActuelle || !sessions[sessionActuelle]) return alert("Aucune session à exporter");
-  const s = sessions[sessionActuelle];
-  let txt = `RELEVÉ CEAI — ${sessionActuelle}\n${'='.repeat(40)}\n`;
-  txt += `Date d'édition : ${new Date().toLocaleString("fr-FR")}\nStatut : ${s.cloture ? "CLÔTURÉ" : "OUVERT"}\n\nCOTISATIONS :\n`;
-  membres.forEach(m => {
-    const verse = s.versements[m.id] || 0;
-    const reste = Math.max(0, MONTANT_COTISATION - verse);
-    txt += `- ${m.nom} : ${verse.toLocaleString("fr-FR")} F / ${MONTANT_COTISATION} F`;
-    txt += reste > 0 ? ` · Reste : ${reste.toLocaleString("fr-FR")} F` : " · PAYÉ";
-    txt += "\n";
-  });
-  if (s.depenses.length) {
-    txt += "\nDÉPENSES & RÉALISATIONS :\n";
-    s.depenses.forEach(d => txt += `- ${d.projet} : ${d.montant.toLocaleString("fr-FR")} F (${d.date})\n`);
-  }
-  const blob = new Blob([txt], { type: "text/plain" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `CEAI-Releve-${sessionActuelle.replace(/\s+/g,"-")}.txt`;
-  a.click();
-}
+window.ouvrirDepenses = function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+  document.getElementById("blocDepenses").classList.remove("cache");
+  afficherDepensesSession();
+};
 
-// === PAIEMENT : AFFICHER LES COMPTES ===
-function afficherComptesPaiement() {
+// =====================================================
+// PAIEMENT
+// =====================================================
+window.afficherComptesPaiement = function () {
   const nom = document.getElementById("nomPayeur").value.trim();
-  const montant = document.getElementById("montantAPayer").value.trim();
-  if (!nom || !montant) return alert("Remplissez le nom et le montant");
+  const montant = document.getElementById("montantAPayer").value;
+  if (!nom || !montant) return alert("Remplissez nom et montant");
   document.getElementById("infosPaiement").classList.remove("cache");
-}
+};
 
-// === MEMBRES DU CONSEIL ===
-let tempPhoto = "";
-function chargerPhotoConseil(e) {
-  const reader = new FileReader();
-  reader.onload = ev => { tempPhoto = ev.target.result; };
-  reader.readAsDataURL(e.target.files[0]);
-}
-function ajouterMembreConseil() {
-  const nom = document.getElementById("nomConseil").value.trim();
-  if (!nom) return alert("Indiquez le nom");
-  conseil.push({ id: Date.now(), nom, photo: tempPhoto || "" });
-  sauvegarder();
-  document.getElementById("nomConseil").value = "";
-  tempPhoto = "";
-  mettreAJourConseil();
-}
-function mettreAJourConseil() {
-  document.getElementById("conseilMembres").innerHTML = conseil.map(m => `
-    <div class="bloc-membre-conseil">
-      <img src="${m.photo || 'https://via.placeholder.com/70?text=CEAI'}" alt="${m.nom}" />
-      <div><strong>${m.nom}</strong></div>
+window.confirmerPaiementDeclare = async function () {
+  const nom = document.getElementById("nomPayeur").value.trim();
+  const montant = parseInt(document.getElementById("montantAPayer").value);
+  const msg = document.getElementById("msgPaiement");
+  
+  notifications.unshift({
+    id: Date.now(), nom, montant,
+    date: new Date().toLocaleDateString("fr-FR"),
+    session: sessionActuelle || "Non specifiee",
+    statut: "En attente de validation"
+  });
+  if (notifications.length > 20) notifications.pop();
+  await sauvegarder("notifications");
+
+  msg.innerHTML = `Merci ${nom} !<br>Versement de ${montant.toLocaleString("fr-FR")} F enregistre en attente de validation.`;
+  document.getElementById("infosPaiement").classList.add("cache");
+  document.getElementById("nomPayeur").value = "";
+};
+
+// =====================================================
+// PUBLICATIONS
+// =====================================================
+window.publier = async function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+
+  const fichier = document.getElementById("fichierPub").files[0];
+  const description = document.getElementById("descriptionPub").value.trim();
+  if (!fichier && !description) return alert("Ajoutez un fichier ou un texte");
+
+  let urlFichier = null;
+  if (fichier) {
+    if (fichier.size > 8 * 1024 * 1024) return alert("Fichier de 8 Mo maximum");
+    const refFichier = ref(storage, `publications/${Date.now()}_${fichier.name}`);
+    const result = await uploadBytes(refFichier, fichier);
+    urlFichier = await getDownloadURL(result.ref);
+  }
+
+  publications.unshift({
+    id: Date.now(), auteur: utilisateurCourant?.email || "Anonyme",
+    date: new Date().toLocaleString("fr-FR"),
+    url: urlFichier, type: fichier?.type || null, description
+  });
+  await sauvegarder("publications");
+  document.getElementById("fichierPub").value = "";
+  document.getElementById("descriptionPub").value = "";
+  alert("Publie avec succes");
+  mettreAJourPublicationsAccueil();
+};
+
+// =====================================================
+// FONDATEURS
+// =====================================================
+function afficherListeFondateurs() {
+  const conteneur = document.getElementById("listeFondateurs");
+  conteneur.innerHTML = fondateurs.map(f => `
+    <div class="carte-fondateur">
+      <img src="${f.photo || 'https://via.placeholder.com/90?text='+f.nom.substring(0,2)}" alt="${f.nom}" />
+      <h4>${f.nom}</h4>
     </div>
   `).join("");
 }
 
-// === CALCUL CAPITAL ===
-function calculerCapital() {
-  let total = 0;
-  Object.values(sessions).forEach(s => {
-    Object.values(s.versements).forEach(v => total += v);
-  });
-  return total;
-}
-
-// === MISES À JOUR GLOBALES ===
+// =====================================================
+// MISES A JOUR AFFICHAGE
+// =====================================================
 function mettreAJourAffichageGlobal() {
-  document.getElementById("capitalGlobal").textContent = calculerCapital().toLocaleString("fr-FR") + " F CFA";
   document.getElementById("nbMembres").textContent = membres.length;
-  document.getElementById("sessionEnCours").textContent = sessionActuelle || "—";
-  
-  // Liste admin
-  document.getElementById("listeMembresAdmin").innerHTML = membres.map(m => `
-    <div class="ligne-membre"><span><strong>${m.nom}</strong> ${m.tel ? "· " + m.tel : ""} ${m.dateAdhesion ? "· Adhésion : " + m.dateAdhesion : ""}</span>
-    <button class="btn-suppr" onclick="supprimerMembre(${m.id})">Retirer</button></div>
-  `).join("");
+  const capital = sessionActuelle && sessions[sessionActuelle] ? sessions[sessionActuelle].capitalMois || 0 : 0;
+  document.getElementById("capitalGlobal").textContent = capital.toLocaleString("fr-FR") + " F CFA";
+  document.getElementById("sessionEnCours").textContent = sessionActuelle || "Non definie";
+}
 
-  // Sélection membre cotisation
-  document.getElementById("selectionMembreCot").innerHTML = `<option value="">-- Choisir un membre --</option>` +
+function mettreAJourListeMembresSelect() {
+  const sel = document.getElementById("selectionMembreCot");
+  sel.innerHTML = `<option value="">-- Choisir un membre --</option>` +
     membres.map(m => `<option value="${m.id}">${m.nom}</option>`).join("");
-
-  mettreAJourConseil();
 }
 
-function supprimerMembre(id) {
-  if (!confirm("Confirmer le retrait ?")) return;
-  membres = membres.filter(m => m.id !== id);
-  sauvegarder();
-  mettreAJourAffichageGlobal();
-}
-
-// === MISE À JOUR SESSION ===
 function mettreAJourAffichageSession() {
   if (!sessionActuelle || !sessions[sessionActuelle]) return;
   const s = sessions[sessionActuelle];
-  document.getElementById("titreSession").textContent = `Tableau des cotisations — ${sessionActuelle} ${s.cloture ? "🔒 (Clôturé)" : ""}`;
+  const quota = s.quota || 0;
+  document.getElementById("titreSession").textContent = 
+    `Cotisations — ${sessionActuelle} — Quota: ${quota.toLocaleString("fr-FR")} F ${s.cloture ? 'CLOTURE' : ''}`;
   
-  document.getElementById("tableauVersements").innerHTML = membres.length === 0
-    ? "<p>Aucun membre enregistré</p>"
-    : membres.map(m => {
-        const verse = s.versements[m.id] || 0;
-        const reste = Math.max(0, MONTANT_COTISATION - verse);
-        let statut, classe;
-        if (verse === 0) { statut = "En attente"; classe = "statut-attente"; }
-        else if (reste > 0) { statut = `Reste : ${reste.toLocaleString("fr-FR")} F`; classe = "statut-partiel"; }
-        else { statut = "Payé"; classe = "statut-paye"; }
-        return `<div class="ligne-versement"><div><strong>${m.nom}</strong><br>Versé : ${verse.toLocaleString("fr-FR")} F / ${MONTANT_COTISATION} F</div><div class="${classe}">${statut}</div></div>`;
-      }).join("");
+  document.getElementById("tableauVersements").innerHTML = membres.map(m => {
+    const verse = s.versements[m.id] || 0;
+    const reste = Math.max(0, quota - verse);
+    const statut = reste === 0 ? "statut-paye" : verse > 0 ? "statut-partiel" : "statut-attente";
+    return `<div class="ligne-versement">
+      <span><strong>${m.nom}</strong></span>
+      <span>${verse.toLocaleString("fr-FR")} / ${quota.toLocaleString("fr-FR")} F</span>
+      <span>${reste > 0 ? `Reste: ${reste.toLocaleString("fr-FR")} F` : "PAYE"}</span>
+      <span class="${statut}">${reste === 0 ? "PAYE" : verse > 0 ? "EN COURS" : "EN ATTENTE"}</span>
+    </div>`;
+  }).join("");
 
-  // Liste des mois clôturés
-  document.getElementById("moisClotures").innerHTML = Object.entries(sessions)
-    .filter(([,v]) => v.cloture)
-    .map(([nom]) => `<div class="ligne-membre"><span>🔒 ${nom}</span><button onclick="exporterRelevePour('${nom}')">Télécharger</button></div>`)
-    .join("");
+  document.getElementById("notificationsPaiement").innerHTML = notifications.slice(0,5).map(n => `
+    <div class="ligne-notif">${n.nom} : ${n.montant.toLocaleString("fr-FR")} F — ${n.date}</div>
+  `).join("") || "<p>Aucune notification</p>";
 
-  afficherDepensesSession();
-}
-
-function exporterRelevePour(nomSession) {
-  sessionActuelle = nomSession;
-  mettreAJourAffichageSession();
-  exporterReleve();
-}
-
-// === INIT ===
-window.onload = function() {
-  document.getElementById("passwordInput").addEventListener("keypress", e => e.key==="Enter" && seConnecter());
-  document.getElementById("mdpDepenses").addEventListener("keypress", e => e.key==="Enter" && verifierDepenses());
   mettreAJourAffichageGlobal();
-  if (sessionActuelle) {
-    document.getElementById("sessionMois").value = sessionActuelle;
-    mettreAJourAffichageSession();
+}
+
+function mettreAJourPublicationsAccueil() {
+  const conteneur = document.getElementById("publicationsAccueil");
+  if (!publications.length) {
+    conteneur.innerHTML = "<p class='note'>Aucune publication pour l'instant</p>"; return;
   }
+  conteneur.innerHTML = publications.map(pub => `
+    <div class="carte-publication">
+      ${pub.url ? (pub.type?.startsWith('video') 
+        ? `<video controls src="${pub.url}" style="max-height:250px;"></video>` 
+        : `<img src="${pub.url}" alt="Publication" />`) : ''}
+      <div class="contenu-pub">
+        <p>${pub.description || ''}</p>
+        <p class="date-pub">${pub.date}</p>
+      </div>
+    </div>
+  `).join("");
+}
+
+// =====================================================
+// EXPORT RELEVE
+// =====================================================
+window.exporterReleve = function () {
+  if (!sessionActuelle || !sessions[sessionActuelle]) return alert("Aucune session");
+  const s = sessions[sessionActuelle];
+  const quota = s.quota || 0;
+  let txt = `RELEVE CEAI — ${sessionActuelle}\n========================================\nQuota: ${quota.toLocaleString("fr-FR")} F\nCapital: ${(s.capitalMois||0).toLocaleString("fr-FR")} F\n\n`;
+  membres.forEach(m => {
+    const verse = s.versements[m.id]||0, reste = Math.max(0, quota - verse);
+    txt += `- ${m.nom} : ${verse.toLocaleString("fr-FR")} F ${reste?`(Reste: ${reste.toLocaleString("fr-FR")} F)`:"PAYE"}\n`;
+  });
+  const blob = new Blob([txt], {type:"text/plain"});
+  const a = document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=`CEAI-${sessionActuelle}.txt`; a.click();
 };
-
-// === GESTION DES PHOTOS DES FONDATEURS ===
-let photoEnAttente = "";
-
-function chargerPhotoFondateur(e) {
-  const reader = new FileReader();
-  reader.onload = ev => {
-    photoEnAttente = ev.target.result;
-  };
-  reader.readAsDataURL(e.target.files[0]);
-}
-
-function enregistrerPhotoFondateur() {
-  const choix = document.getElementById("selectionFondateur").value;
-  if (!choix) return alert("Sélectionnez d'abord un fondateur");
-  if (!photoEnAttente) return alert("Choisissez une photo");
-  document.getElementById(`photo-${choix}`).src = photoEnAttente;
-  // Sauvegarder dans le stockage
-  localStorage.setItem(`ceai_photo_fondateur_${choix}`, photoEnAttente);
-  alert("Photo enregistrée !");
-  photoEnAttente = "";
-}
-
-// Restaurer les photos au chargement
-window.addEventListener("load", function() {
-  for (let i = 1; i <= 5; i++) {
-    const sauvegardee = localStorage.getItem(`ceai_photo_fondateur_${i}`);
-    if (sauvegardee) {
-      document.getElementById(`photo-${i}`).src = sauvegardee;
-    }
-  }
-});
+    
