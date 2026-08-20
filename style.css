@@ -104,3 +104,103 @@ body { background: linear-gradient(135deg, #0a192f, #112240); color: #e6f1ff; mi
   .titre-centre h1 { font-size: 1rem; }
   .fondateurs-grille { grid-template-columns: repeat(2, 1fr); }
                                      }
+/* --- Ligne membre admin --- */
+.ligne-membre-admin {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* --- Boutons supprimer --- */
+.btn-supprimer, .btn-supprimer-ligne {
+  background: #901010;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-supprimer:hover, .btn-supprimer-ligne:hover {
+  background: #c01818;
+}
+
+.ligne-versement {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+/* --- Icône menu trois traits --- */
+.btn-menu {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(90deg, var(--bleu), var(--orange));
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.icone-menu {
+  font-size: 1.4rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+/* --- Badge notification --- */
+.badge-notif {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff3030;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: bold;
+  border-radius: 10px;
+  padding: 0.15rem 0.45rem;
+  margin-left: 0.5rem;
+  min-width: 20px;
+}
+
+/* --- Boite info paiement --- */
+.boite-info-notification {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  background: rgba(255,180,0,0.12);
+  border-radius: 8px;
+  border-left: 3px solid #ffb800;
+  color: #ffe8a0;
+}
+
+/* --- Ligne notification --- */
+.ligne-notification {
+  padding: 0.9rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  margin-bottom: 0.3rem;
+  border-radius: 6px;
+}
+
+.ligne-notification.nouvelle {
+  background: rgba(0,120,255,0.1);
+  border-left: 3px solid #0090ff;
+}
+
+.ligne-notification .date-notif {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 0.3rem;
+  }
