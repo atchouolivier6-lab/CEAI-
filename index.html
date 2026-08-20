@@ -67,17 +67,24 @@
       </div>
     </header>
 
-    <!-- MENU DEROULANT -->
+       <!-- MENU DEROULANT -->
     <nav class="menu-principal">
       <div class="container">
         <div class="menu-deroulant">
-          <button class="btn-menu" onclick="toggleMenu()">MENU — Sélectionner une rubrique</button>
+          <button class="btn-menu" onclick="toggleMenu()">
+            <span class="icone-menu">☰</span>
+            MENU
+          </button>
           <div id="optionsMenu" class="options-cachees">
             <a href="#" onclick="afficherSection('accueil')">Page d'accueil</a>
             <a href="#" onclick="afficherSection('admin-membres')">Ajouter un membre</a>
             <a href="#" onclick="afficherSection('adherer')">Adhérer à CEAI</a>
             <a href="#" onclick="afficherSection('cotisations')">Suivi des cotisations</a>
             <a href="#" onclick="afficherSection('paiement')">Faire mon paiement</a>
+            <a href="#" onclick="afficherSection('notifications')">
+              Notifications
+              <span id="compteurNotifs" class="badge-notif cache">0</span>
+            </a>
             <a href="#" onclick="afficherSection('publication')">Espace de publication</a>
             <a href="#" onclick="afficherSection('apropos')">À propos de CEAI</a>
             <a href="#" onclick="ouvrirEspaceAdmin()">Accès Administrateur</a>
@@ -86,8 +93,6 @@
         </div>
       </div>
     </nav>
-
-    <main class="container">
 
       <!-- === PAGE D'ACCUEIL === -->
       <section id="sec-accueil" class="section active">
@@ -118,10 +123,10 @@
         </div>
       </section>
 
-      <!-- === AJOUTER UN MEMBRE === -->
+            <!-- === AJOUTER UN MEMBRE === -->
       <section id="sec-admin-membres" class="section">
-        <h2>Ajouter un membre</h2>
-        <p class="note zone-public">Seul l'administrateur peut ajouter un nouveau membre.</p>
+        <h2>Gestion des membres</h2>
+        <p class="note zone-public">Seul l'administrateur peut ajouter ou supprimer un membre.</p>
         <p class="note zone-admin cache">Pas de limite de membres · Le système détecte automatiquement les doublons.</p>
         <div class="formulaire zone-admin cache">
           <h3>Enregistrer un nouveau membre</h3>
@@ -129,6 +134,12 @@
           <input type="tel" id="telMembreAdmin" placeholder="Numéro de téléphone" />
           <input type="text" id="dateAdhesionAdmin" placeholder="Date d'adhésion (ex: 15/01/2026)" />
           <button onclick="ajouterMembreAdmin()">Enregistrer le membre</button>
+        </div>
+
+        <!-- LISTE DES MEMBRES AVEC BOUTONS SUPPRESSION -->
+        <div class="zone-admin cache">
+          <h3>Liste des membres enregistrés</h3>
+          <div id="listeMembresAdmin" class="liste-membres-admin"></div>
         </div>
       </section>
 
@@ -184,7 +195,7 @@
           <div id="tableauVersements"></div>
         </div>
 
-        <!-- DEPENSES -->
+                <!-- DÉPENSES & RÉALISATIONS --- UNIQUEMENT ADMIN -->
         <div id="blocDepenses" class="cache zone-admin">
           <h3>Dépenses & Réalisations</h3>
           <div class="formulaire">
@@ -200,7 +211,7 @@
         <div id="notificationsPaiement"></div>
       </section>
 
-      <!-- === PAIEMENT === -->
+            <!-- === PAIEMENT === -->
       <section id="sec-paiement" class="section">
         <h2>Faire mon paiement</h2>
         <div class="formulaire">
@@ -216,10 +227,25 @@
             <p>MTN Bénin : +229 0167780104</p>
             <p>Moov Bénin : +229 0167780104</p>
           </div>
-          <p style="margin-top:0.8rem;">Après paiement, revenez sur le site pour que l'administration valide votre versement.</p>
+          
+          <!--  NOUVEAU MESSAGE AJOUTÉ ICI -->
+          <div class="boite-info-notification">
+            <p>📩 <strong>Veuillez télécharger une image de capture d'écran et l'envoyer par WhatsApp au numéro sur lequel vous avez effectué la transaction.</strong></p>
+          </div>
+          
+          <p style="margin-top:0.8rem;">Après paiement et envoi de la capture, revenez sur le site pour confirmer.</p>
           <button onclick="confirmerPaiementDeclare()" style="margin-top:1rem;">J'ai effectué mon paiement</button>
         </div>
         <p id="msgPaiement" class="message-info"></p>
+      </section>     
+    <!-- === NOTIFICATIONS === -->
+      <section id="sec-notifications" class="section">
+        <h2>Notifications</h2>
+        <p class="note">Toutes les activités et nouveautés de CEAI.</p>
+        <div id="listeNotifications">
+          <p class="note">Aucune notification pour l'instant</p>
+        </div>
+        <button class="zone-admin cache" onclick="toutMarquerCommeLu()">Tout marquer comme lu</button>
       </section>
 
       <!-- === PUBLICATION === -->
