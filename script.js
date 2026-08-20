@@ -145,7 +145,19 @@ function traduireErreurAuth(code) {
 async function chargerDonneesFirebase() {
   try {
     const dbRef = ref(db);
-    
+    async function chargerDonneesFirebase() {
+  try {
+    // ... (gardez tout le code existant)
+
+    mettreAJourListeMembresSelect();
+    mettreAJourAffichageSession();
+    mettreAJourPublicationsAccueil();
+    afficherListeMembresAdmin(); // ✅ AJOUTEZ CETTE LIGNE
+  } catch (e) {
+    console.error("Erreur chargement :", e);
+    alert("Impossible de charger les donnees. Verifiez les regles Firebase.");
+  }
+    }
     const snapMembres = await get(child(dbRef, "membres"));
     if (snapMembres.exists()) membres = snapMembres.val() || [];
 
@@ -256,24 +268,11 @@ function membreExisteDeja(nom, tel) {
 }
 
 window.ajouterMembreAdmin = async function () {
-  if (!accesAdmin) return alert("Acces administrateur requis");
-
-  const nom = document.getElementById("nomMembreAdmin").value.trim();
-  const tel = document.getElementById("telMembreAdmin").value.trim();
-  const date = document.getElementById("dateAdhesionAdmin").value.trim();
-  
-  if (!nom) return alert("Saisissez le nom et prenom");
-  if (membreExisteDeja(nom, tel)) return alert("Ce membre existe deja");
-
-  membres.push({ id: Date.now(), nom, tel, date: date || new Date().toLocaleDateString("fr-FR") });
-  await sauvegarder("membres");
-  
-  document.getElementById("nomMembreAdmin").value = "";
-  document.getElementById("telMembreAdmin").value = "";
-  document.getElementById("dateAdhesionAdmin").value = "";
+  // ... (gardez tout le code existant)
   
   mettreAJourAffichageGlobal();
   mettreAJourListeMembresSelect();
+  afficherListeMembresAdmin(); // AJOUTEZ CETTE LIGNE
   alert("Membre ajoute avec succes");
 };
 
@@ -410,8 +409,14 @@ function afficherListeDepenses() {
   if (!sessionActuelle || !sessions[sessionActuelle]) return;
   const liste = sessions[sessionActuelle].depenses;
   document.getElementById("listeDepenses").innerHTML = liste.length === 0
-    ? "<p>Aucune depense enregistree</p>"
-    : liste.map(d => `<div class="ligne-depense"><span>${d.projet}</span><span>${d.montant.toLocaleString("fr-FR")} F · ${d.date}</span></div>`).join("");
+    ? "<p>Aucune dépense enregistrée</p>"
+    : liste.map((d, index) => `<div class="ligne-depense">
+        <span>${d.projet}</span>
+        <span>${d.montant.toLocaleString("fr-FR")} F · ${d.date}</span>
+        ${accesAdmin && !sessions[sessionActuelle].cloture 
+          ? `<button class="btn-supprimer-ligne" onclick="supprimerDepense(${index})">Supprimer</button>` 
+          : ""}
+      </div>`).join("");
 }
 
 // =====================================================
@@ -533,7 +538,7 @@ function mettreAJourAffichageSession() {
   document.getElementById("titreSession").textContent = 
     `Cotisations — ${sessionActuelle} — Quota: ${quota.toLocaleString("fr-FR")} F ${s.cloture ? 'CLOTUREE' : ''}`;
   
-  document.getElementById("tableauVersements").innerHTML = membres.map(m => {
+  document.getElementById("tableauVersements").innerHTML = membres.map((m, idx) => {
     const verse = s.versements[m.id] || 0;
     const reste = Math.max(0, quota - verse);
     const statut = reste === 0 ? "statut-paye" : verse > 0 ? "statut-partiel" : "statut-attente";
@@ -542,6 +547,9 @@ function mettreAJourAffichageSession() {
       <span>${verse.toLocaleString("fr-FR")} / ${quota.toLocaleString("fr-FR")} F</span>
       <span>${reste > 0 ? `Reste: ${reste.toLocaleString("fr-FR")} F` : "PAYE"}</span>
       <span class="${statut}">${reste === 0 ? "PAYE" : verse > 0 ? "EN COURS" : "EN ATTENTE"}</span>
+      ${accesAdmin && verse > 0 && !s.cloture 
+        ? `<button class="btn-supprimer-ligne" onclick="supprimerVersement('${m.id}')">Annuler</button>` 
+        : ""}
     </div>`;
   }).join("");
 
@@ -550,7 +558,7 @@ function mettreAJourAffichageSession() {
   `).join("") || "<p>Aucune notification</p>";
 
   mettreAJourAffichageGlobal();
-}
+    }
 
 function mettreAJourPublicationsAccueil() {
   const conteneur = document.getElementById("publicationsAccueil");
@@ -604,4 +612,77 @@ window.exporterReleve = function () {
   lien.download = `CEAI-Releve-${sessionActuelle.replace(/\s+/g, '-')}.txt`;
   lien.click();
 };
-    
+    // =====================================================
+// AFFICHER LISTE MEMBRES AVEC SUPPRESSION (ADMIN)
+// =====================================================
+function afficherListeMembresAdmin() {
+  const conteneur = document.getElementById("listeMembresAdmin");
+  if (!conteneur) return;
+
+  if (membres.length === 0) {
+    conteneur.innerHTML = "<p class='note'>Aucun membre enregistré</p>";
+    return;
+  }
+
+  conteneur.innerHTML = membres.map((m, index) => `
+    <div class="ligne-membre-admin">
+      <span><strong>${m.nom}</strong> ${m.tel ? `· ${m.tel}` : ''} · ${m.date || ''}</span>
+      <button class="btn-supprimer" onclick="supprimerMembre(${index})">Retirer</button>
+    </div>
+  `).join("");
+}
+
+// =====================================================
+// SUPPRIMER UN MEMBRE
+// =====================================================
+window.supprimerMembre = async function (index) {
+  if (!accesAdmin) return alert("Accès administrateur requis");
+
+  const membre = membres[index];
+  if (!confirm(`Confirmez-vous le ret·rait de « ${membre.nom} » ?\nSes cotisations seront conservées dans l'historique.`)) return;
+
+  membres.splice(index, 1);
+  await sauvegarder("membres");
+  afficherListeMembresAdmin();
+  mettreAJourListeMembresSelect();
+  mettreAJourAffichageGlobal();
+  alert("Membre retiré avec succès");
+};
+
+// =====================================================
+// SUPPRIMER UN VERSEMENT
+// =====================================================
+window.supprimerVersement = async function (idMembre) {
+  if (!accesAdmin) return alert("Accès administrateur requis");
+  if (!sessionActuelle || !sessions[sessionActuelle]) return;
+  const s = sessions[sessionActuelle];
+  if (s.cloture) return alert("Session clôturée, impossible de modifier");
+
+  const montantActuel = s.versements[idMembre] || 0;
+  if (!confirm(`Confirmez-vous la suppression du versement de ${montantActuel.toLocaleString("fr-FR")} F ?`)) return;
+
+  delete s.versements[idMembre];
+  s.capital = Object.values(s.versements).reduce((a, b) => a + b, 0);
+
+  await sauvegarder("sessions");
+  mettreAJourAffichageSession();
+  alert("Versement supprimé");
+};
+
+// =====================================================
+// SUPPRIMER UNE DEPENSE
+// =====================================================
+window.supprimerDepense = async function (index) {
+  if (!accesAdmin) return alert("Accès administrateur requis");
+  if (!sessionActuelle || !sessions[sessionActuelle]) return;
+  const s = sessions[sessionActuelle];
+  if (s.cloture) return alert("Session clôturée, impossible de modifier");
+
+  const dep = s.depenses[index];
+  if (!confirm(`Confirmez-vous la suppression de la dépense :\n« ${dep.projet} » — ${dep.montant.toLocaleString("fr-FR")} F ?`)) return;
+
+  s.depenses.splice(index, 1);
+  await sauvegarder("sessions");
+  afficherListeDepenses();
+  alert("Dépense supprimée");
+};
