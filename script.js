@@ -507,4 +507,248 @@ window.supprimerDepense = async function (index) {
   creerNotification(`🗑️ Depense supprimee : ${dep.projet}`, "info");
   await sauvegarder("sessions");
   afficherListeDepenses();
-  alert("Depense sup
+  alert("Depense supprimee");
+};
+
+// =====================================================
+// PAIEMENT
+// =====================================================
+window.afficherComptesPaiement = function () {
+  const nom = document.getElementById("nomPayeur").value.trim();
+  const montant = document.getElementById("montantAPayer").value;
+  if (!nom || !montant) return alert("Remplissez nom et montant");
+  document.getElementById("infosPaiement").classList.remove("cache");
+};
+
+window.confirmerPaiementDeclare = async function () {
+  const nom = document.getElementById("nomPayeur").value.trim();
+  const montant = parseInt(document.getElementById("montantAPayer").value);
+  const msg = document.getElementById("msgPaiement");
+  
+  notifications.unshift({
+    id: Date.now(), nom, montant,
+    date: new Date().toLocaleDateString("fr-FR"),
+    session: sessionActuelle || "Non specifiee",
+    statut: "En attente de validation"
+  });
+  if (notifications.length > 20) notifications.pop();
+
+  creerNotification(`💳 Paiement declare : ${nom} — ${montant.toLocaleString("fr-FR")} F CFA`, "paiement");
+
+  await sauvegarder("notifications");
+
+  msg.innerHTML = `Merci ${nom} !<br>Versement de ${montant.toLocaleString("fr-FR")} F enregistre en attente de validation.`;
+  document.getElementById("infosPaiement").classList.add("cache");
+  document.getElementById("nomPayeur").value = "";
+  document.getElementById("montantAPayer").value = "";
+};
+
+// =====================================================
+// PUBLICATIONS
+// =====================================================
+window.publier = async function () {
+  if (!accesAdmin) return alert("Acces administrateur requis");
+
+  const fichier = document.getElementById("fichierPub").files[0];
+  const description = document.getElementById("descriptionPub").value.trim();
+  
+  if (!fichier && !description) {
+    return alert("Veuillez selectionner un fichier OU ecrire une description");
+  }
+
+  try {
+    let urlFichier = null;
+
+    if (fichier) {
+      if (fichier.size > 8 * 1024 * 1024) {
+        return alert("Fichier trop volumineux (8 Mo maximum)");
+      }
+      const cheminFichier = "publications/" + Date.now() + "_" + fichier.name;
+      const refStockage = storageRef(storage, cheminFichier);
+      const resultat = await uploadBytes(refStockage, fichier);
+      urlFichier = await getDownloadURL(resultat.ref);
+    }
+
+    publications.unshift({
+      id: Date.now(),
+      auteur: utilisateurCourant?.email || "Anonyme",
+      date: new Date().toLocaleString("fr-FR"),
+      url: urlFichier,
+      type: fichier?.type || null,
+      description: description
+    });
+
+    creerNotification(`📰 Nouvelle publication : ${description.substring(0,40)}${description.length>40?'...':''}`, "info");
+
+    await sauvegarder("publications");
+    
+    document.getElementById("fichierPub").value = "";
+    document.getElementById("descriptionPub").value = "";
+    
+    alert("Publication reussie !");
+    mettreAJourPublicationsAccueil();
+
+  } catch (erreur) {
+    console.error("Erreur publication :", erreur);
+    alert("Echec de la publication : " + erreur.message);
+  }
+};
+
+// =====================================================
+// SYSTEME DE NOTIFICATIONS
+// =====================================================
+function creerNotification(contenu, type = "info") {
+  const nouvelleNotif = {
+    id: Date.now(),
+    contenu: contenu,
+    type: type,
+    date: new Date().toLocaleString("fr-FR"),
+    lu: false
+  };
+  notifications.unshift(nouvelleNotif);
+  if (notifications.length > 50) notifications.pop();
+  sauvegarder("notifications");
+  mettreAJourCompteurNotifications();
+  mettreAJourAffichageNotifications();
+}
+
+function mettreAJourCompteurNotifications() {
+  const nonLues = notifications.filter(n => !n.lu).length;
+  const badge = document.getElementById("compteurNotifs");
+  if (badge) {
+    if (nonLues > 0) {
+      badge.textContent = nonLues;
+      badge.classList.remove("cache");
+    } else {
+      badge.classList.add("cache");
+    }
+  }
+}
+
+function mettreAJourAffichageNotifications() {
+  const conteneur = document.getElementById("listeNotifications");
+  if (!conteneur) return;
+
+  if (notifications.length === 0) {
+    conteneur.innerHTML = "<p class='note'>Aucune notification pour l'instant</p>";
+    return;
+  }
+
+  conteneur.innerHTML = notifications.map(n => `
+    <div class="ligne-notification ${!n.lu ? 'nouvelle' : ''}">
+      <p>${n.contenu}</p>
+      <p class="date-notif">${n.date}</p>
+    </div>
+  `).join("");
+}
+
+window.toutMarquerCommeLu = async function () {
+  notifications.forEach(n => n.lu = true);
+  await sauvegarder("notifications");
+  mettreAJourCompteurNotifications();
+  mettreAJourAffichageNotifications();
+  alert("Toutes les notifications ont ete marquees comme lues");
+};
+
+// =====================================================
+// MISES A JOUR AFFICHAGE
+// =====================================================
+function mettreAJourAffichageGlobal() {
+  document.getElementById("nbMembres").textContent = membres.length;
+  const capital = sessionActuelle && sessions[sessionActuelle] ? sessions[sessionActuelle].capital || 0 : 0;
+  document.getElementById("capitalGlobal").textContent = capital.toLocaleString("fr-FR") + " F CFA";
+  document.getElementById("sessionEnCours").textContent = sessionActuelle || "Non definie";
+}
+
+function mettreAJourListeMembresSelect() {
+  const sel = document.getElementById("selectionMembreCot");
+  sel.innerHTML = `<option value="">-- Choisir un membre --</option>` +
+    membres.map(m => `<option value="${m.id}">${m.nom}</option>`).join("");
+}
+
+function mettreAJourAffichageSession() {
+  if (!sessionActuelle || !sessions[sessionActuelle]) return;
+  const s = sessions[sessionActuelle];
+  const quota = s.quota || 0;
+  
+  document.getElementById("titreSession").textContent = 
+    `Cotisations — ${sessionActuelle} — Quota: ${quota.toLocaleString("fr-FR")} F ${s.cloture ? 'CLOTUREE' : ''}`;
+  
+  document.getElementById("tableauVersements").innerHTML = membres.map((m) => {
+    const verse = s.versements[m.id] || 0;
+    const reste = Math.max(0, quota - verse);
+    const statut = reste === 0 ? "statut-paye" : verse > 0 ? "statut-partiel" : "statut-attente";
+    return `<div class="ligne-versement">
+      <span><strong>${m.nom}</strong></span>
+      <span>${verse.toLocaleString("fr-FR")} / ${quota.toLocaleString("fr-FR")} F</span>
+      <span>${reste > 0 ? `Reste: ${reste.toLocaleString("fr-FR")} F` : "PAYE"}</span>
+      <span class="${statut}">${reste === 0 ? "PAYE" : verse > 0 ? "EN COURS" : "EN ATTENTE"}</span>
+      ${accesAdmin && verse > 0 && !s.cloture 
+        ? `<button class="btn-supprimer-ligne" onclick="supprimerVersement('${m.id}')">Annuler</button>` 
+        : ""}
+    </div>`;
+  }).join("");
+
+  document.getElementById("notificationsPaiement").innerHTML = notifications.slice(0, 5).map(n => {
+    if (n.nom && n.montant) {
+      return `<div class="ligne-notif">${n.nom} : ${n.montant.toLocaleString("fr-FR")} F — ${n.date}</div>`;
+    }
+    return "";
+  }).join("") || "<p>Aucune notification</p>";
+
+  mettreAJourAffichageGlobal();
+}
+
+function mettreAJourPublicationsAccueil() {
+  const conteneur = document.getElementById("publicationsAccueil");
+  const listePub = document.getElementById("listePublications");
+  
+  if (!publications.length) {
+    conteneur.innerHTML = "<p class='note'>Aucune publication pour l'instant</p>";
+    if (listePub) listePub.innerHTML = "<p class='note'>Aucune publication pour l'instant</p>";
+    return;
+  }
+
+  const html = publications.map(pub => `
+    <div class="carte-publication">
+      ${pub.url ? (pub.type?.startsWith('video') 
+        ? `<video controls src="${pub.url}" style="max-height:250px;"></video>` 
+        : `<img src="${pub.url}" alt="Publication" />`) : ''}
+      <div class="contenu-pub">
+        <p>${pub.description || ''}</p>
+        <p class="date-pub">${pub.date}</p>
+      </div>
+    </div>
+  `).join("");
+
+  conteneur.innerHTML = html;
+  if (listePub) listePub.innerHTML = html;
+}
+
+// =====================================================
+// EXPORT RELEVE
+// =====================================================
+window.exporterReleve = function () {
+  if (!sessionActuelle || !sessions[sessionActuelle]) return alert("Aucune session selectionnee");
+  const s = sessions[sessionActuelle];
+  const quota = s.quota || 0;
+  let texte = `RELEVE CEAI — ${sessionActuelle}\n========================================\nQuota: ${quota.toLocaleString("fr-FR")} F CFA\nCapital total: ${(s.capital||0).toLocaleString("fr-FR")} F CFA\n\n`;
+  
+  membres.forEach(m => {
+    const verse = s.versements[m.id] || 0;
+    const reste = Math.max(0, quota - verse);
+    texte += `- ${m.nom} : ${verse.toLocaleString("fr-FR")} F CFA ${reste > 0 ? `(Reste: ${reste.toLocaleString("fr-FR")} F CFA)` : "PAYE"}\n`;
+  });
+
+  if (s.depenses?.length) {
+    texte += "\n--- DEPENSES ---\n";
+    s.depenses.forEach(d => texte += `- ${d.projet} : ${d.montant.toLocaleString("fr-FR")} F CFA (${d.date})\n`);
+  }
+
+  const fichier = new Blob([texte], { type: "text/plain" });
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(fichier);
+  lien.download = `CEAI-Releve-${sessionActuelle.replace(/\s+/g, '-')}.txt`;
+  lien.click();
+};
+                                                                                                    
